@@ -26,7 +26,7 @@ const menuItems = [
 ];
 
 export function TeacherProfileScreen() {
-  const { userName, navigate } = useApp();
+  const { userName, navigate, setRole } = useApp();
 
   const totalStudents = sampleTeacherData.classes.reduce(
     (sum, c) => sum + c.students,

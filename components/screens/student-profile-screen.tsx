@@ -26,7 +26,7 @@ const menuItems = [
 ];
 
 export function StudentProfileScreen() {
-  const { userName, navigate } = useApp();
+  const { userName, navigate, setRole } = useApp();
 
   return (
     <div className="flex flex-col gap-6 px-4 py-6">
@@ -122,7 +122,7 @@ export function StudentProfileScreen() {
       {/* Logout */}
       <Button
         variant="outline"
-        onClick={() => navigate("auth")}
+        onClick={() => { setRole(null); navigate("auth"); }}
         className="gap-2 rounded-2xl border-destructive/30 bg-transparent py-5 text-destructive hover:bg-destructive/10 hover:text-destructive"
       >
         <LogOut className="h-4 w-4" />

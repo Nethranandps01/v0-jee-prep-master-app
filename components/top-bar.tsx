@@ -6,7 +6,7 @@ import { Bell, Search, Sun, Moon, Zap, UserCircle } from "lucide-react";
 import { sampleNotifications } from "@/lib/sample-data";
 
 export function TopBar() {
-  const { navigate, role } = useApp();
+  const { navigate, role, screen } = useApp();
   const { theme, setTheme } = useTheme();
   const unreadCount = sampleNotifications.filter((n) => !n.read).length;
 
