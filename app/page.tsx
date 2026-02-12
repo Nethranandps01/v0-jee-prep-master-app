@@ -18,6 +18,11 @@ import { TeacherPaperGeneratorScreen } from "@/components/screens/teacher-paper-
 import { TeacherLibraryScreen } from "@/components/screens/teacher-library-screen";
 import { TeacherClassesScreen } from "@/components/screens/teacher-classes-screen";
 import { TeacherProfileScreen } from "@/components/screens/teacher-profile-screen";
+import { TeacherLessonPlansScreen } from "@/components/screens/teacher-lesson-plans-screen";
+import { AdminDashboardScreen } from "@/components/screens/admin-dashboard-screen";
+import { AdminUsersScreen } from "@/components/screens/admin-users-screen";
+import { AdminContentScreen } from "@/components/screens/admin-content-screen";
+import { AdminReportsScreen } from "@/components/screens/admin-reports-screen";
 import { NotificationsScreen } from "@/components/screens/notifications-screen";
 import { AIChatScreen } from "@/components/screens/ai-chat-screen";
 import { TopBar } from "@/components/top-bar";
@@ -67,6 +72,16 @@ function AppScreens() {
         return <TeacherClassesScreen />;
       case "teacher-profile":
         return <TeacherProfileScreen />;
+      case "teacher-lesson-plans":
+        return <TeacherLessonPlansScreen />;
+      case "admin-dashboard":
+        return <AdminDashboardScreen />;
+      case "admin-users":
+        return <AdminUsersScreen />;
+      case "admin-content":
+        return <AdminContentScreen />;
+      case "admin-reports":
+        return <AdminReportsScreen />;
       case "notifications":
         return <NotificationsScreen />;
       case "ai-chat":

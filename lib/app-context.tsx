@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-export type UserRole = "student" | "teacher" | null;
+export type UserRole = "student" | "teacher" | "admin" | null;
 
 export type AppScreen =
   | "splash"
@@ -23,6 +23,11 @@ export type AppScreen =
   | "teacher-upload"
   | "teacher-classes"
   | "teacher-profile"
+  | "teacher-lesson-plans"
+  | "admin-dashboard"
+  | "admin-users"
+  | "admin-content"
+  | "admin-reports"
   | "notifications"
   | "ai-chat";
 
@@ -39,6 +44,10 @@ interface AppContextType {
   setActiveTestId: (id: string | null) => void;
   completedTestId: string | null;
   setCompletedTestId: (id: string | null) => void;
+  teacherSubject: string | null;
+  setTeacherSubject: (subject: string | null) => void;
+  studentYear: "11th" | "12th" | null;
+  setStudentYear: (year: "11th" | "12th" | null) => void;
   navigate: (screen: AppScreen) => void;
 }
 
@@ -51,6 +60,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [showAIChat, setShowAIChat] = useState(false);
   const [activeTestId, setActiveTestId] = useState<string | null>(null);
   const [completedTestId, setCompletedTestId] = useState<string | null>(null);
+  const [teacherSubject, setTeacherSubject] = useState<string | null>(null);
+  const [studentYear, setStudentYear] = useState<"11th" | "12th" | null>(null);
 
   const navigate = useCallback((newScreen: AppScreen) => {
     setScreen(newScreen);
@@ -71,6 +82,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActiveTestId,
         completedTestId,
         setCompletedTestId,
+        teacherSubject,
+        setTeacherSubject,
+        studentYear,
+        setStudentYear,
         navigate,
       }}
     >

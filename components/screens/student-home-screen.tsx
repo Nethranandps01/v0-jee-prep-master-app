@@ -2,7 +2,7 @@
 
 import { useApp } from "@/lib/app-context";
 import { Button } from "@/components/ui/button";
-import { sampleTests, sampleProgress } from "@/lib/sample-data";
+import { sampleTests, sampleProgress, sampleSubjectWiseMarks } from "@/lib/sample-data";
 import {
   Flame,
   Target,
@@ -12,18 +12,41 @@ import {
   BookOpen,
   Sparkles,
   ChevronRight,
+  Atom,
+  FlaskConical,
+  Calculator,
 } from "lucide-react";
 
 export function StudentHomeScreen() {
-  const { userName, navigate, setActiveTestId } = useApp();
-  const assignedTests = sampleTests.filter((t) => t.status === "assigned");
-  const completedTests = sampleTests.filter((t) => t.status === "completed");
+  const { userName, navigate, setActiveTestId, studentYear } = useApp();
+  const year = studentYear || "12th";
+
+  const assignedTests = sampleTests.filter(
+    (t) => t.status === "assigned" && t.year === year
+  );
+  const completedTests = sampleTests.filter(
+    (t) => t.status === "completed" && t.year === year
+  );
+
+  const subjectMarks = sampleSubjectWiseMarks[year];
+  const subjectSuffix = year === "11th" ? "1" : "2";
+
+  const subjectIcons: Record<string, typeof Atom> = {
+    Physics: Atom,
+    Chemistry: FlaskConical,
+    Mathematics: Calculator,
+  };
 
   return (
     <div className="flex flex-col gap-6 px-4 py-6">
       {/* Greeting */}
       <div className="animate-fade-in flex flex-col gap-1">
-        <p className="text-sm text-muted-foreground">Good morning,</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-muted-foreground">Good morning,</p>
+          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary">
+            {year} Class
+          </span>
+        </div>
         <h1 className="text-2xl font-bold text-foreground text-balance">
           {userName}
         </h1>
@@ -57,6 +80,39 @@ export function StudentHomeScreen() {
             #{sampleProgress.overallRank}
           </span>
           <span className="text-[11px] text-muted-foreground">Rank</span>
+        </div>
+      </div>
+
+      {/* Subject-wise Latest Scores */}
+      <div
+        className="animate-fade-in flex flex-col gap-3"
+        style={{ animationDelay: "150ms" }}
+      >
+        <h2 className="text-base font-semibold text-foreground">
+          Subject Scores
+        </h2>
+        <div className="flex gap-3">
+          {subjectMarks.map((sub) => {
+            const baseName = sub.subject.replace(` ${subjectSuffix}`, "");
+            const Icon = subjectIcons[baseName] || BookOpen;
+            const latestScore = sub.scores[sub.scores.length - 1];
+            return (
+              <div
+                key={sub.subject}
+                className="flex flex-1 flex-col items-center gap-2 rounded-2xl border border-border bg-card p-3"
+              >
+                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                  baseName === "Physics" ? "bg-primary/15" : baseName === "Chemistry" ? "bg-accent/15" : "bg-warning/15"
+                }`}>
+                  <Icon className={`h-4 w-4 ${
+                    baseName === "Physics" ? "text-primary" : baseName === "Chemistry" ? "text-accent" : "text-warning"
+                  }`} />
+                </div>
+                <span className="text-lg font-bold text-foreground">{latestScore}%</span>
+                <span className="text-[10px] text-muted-foreground text-center">{sub.subject}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -97,6 +153,11 @@ export function StudentHomeScreen() {
           </button>
         </div>
         <div className="flex flex-col gap-3">
+          {assignedTests.length === 0 && (
+            <div className="rounded-2xl border border-border bg-card p-6 text-center">
+              <p className="text-sm text-muted-foreground">No upcoming tests for {year} class</p>
+            </div>
+          )}
           {assignedTests.map((test) => (
             <button
               key={test.id}
@@ -160,6 +221,11 @@ export function StudentHomeScreen() {
           </button>
         </div>
         <div className="flex flex-col gap-3">
+          {completedTests.length === 0 && (
+            <div className="rounded-2xl border border-border bg-card p-6 text-center">
+              <p className="text-sm text-muted-foreground">No results yet</p>
+            </div>
+          )}
           {completedTests.map((test) => (
             <button
               key={test.id}

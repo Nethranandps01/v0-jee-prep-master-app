@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useApp } from "@/lib/app-context";
 import { sampleLibrary } from "@/lib/sample-data";
 import {
   BookOpen,
@@ -11,20 +12,22 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-const subjects = ["All", "Physics", "Chemistry", "Mathematics"];
-
 export function StudentLibraryScreen() {
+  const { studentYear } = useApp();
+  const year = studentYear || "12th";
   const [activeSubject, setActiveSubject] = useState("All");
   const [search, setSearch] = useState("");
 
+  const subjectSuffix = year === "11th" ? "1" : "2";
+  const subjects = ["All", `Physics ${subjectSuffix}`, `Chemistry ${subjectSuffix}`, `Mathematics ${subjectSuffix}`];
+
   const filtered = sampleLibrary.filter((item) => {
+    if (item.year !== year && item.subject !== "All") return false;
     const matchSubject =
       activeSubject === "All" ||
-      item.subject === activeSubject ||
+      item.subject === activeSubject.replace(` ${subjectSuffix}`, "") ||
       item.subject === "All";
-    const matchSearch = item.title
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const matchSearch = item.title.toLowerCase().includes(search.toLowerCase());
     return matchSubject && matchSearch;
   });
 
@@ -33,7 +36,7 @@ export function StudentLibraryScreen() {
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-bold text-foreground">Library</h1>
         <p className="text-sm text-muted-foreground">
-          Study materials and resources
+          {year} Class - Study materials and resources
         </p>
       </div>
 
@@ -67,6 +70,11 @@ export function StudentLibraryScreen() {
 
       {/* Material List */}
       <div className="flex flex-col gap-3">
+        {filtered.length === 0 && (
+          <div className="rounded-2xl border border-border bg-card p-8 text-center">
+            <p className="text-sm text-muted-foreground">No materials found</p>
+          </div>
+        )}
         {filtered.map((item, index) => (
           <div
             key={item.id}
