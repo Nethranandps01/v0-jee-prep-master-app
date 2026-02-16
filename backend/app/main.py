@@ -7,12 +7,26 @@ from app.api.router import api_router
 from app.core.config import Settings, get_settings
 
 
+from app.db.client import create_mongo_client
+from app.db.indexes import ensure_indexes  # Added import
 
 def create_app() -> FastAPI:
     settings: Settings = get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Startup: Connect to DB
+        try:
+            client = create_mongo_client(settings.mongodb_uri)
+            db = client[settings.mongodb_db]
+            ensure_indexes(db)
+            app.state.mongo_client = client
+            app.state.db = db
+            print("Successfully connected to MongoDB and ensured indexes.")
+        except Exception as e:
+            print(f"Failed to connect to MongoDB during startup: {e}")
+            # we don't raise here to allow app to start, but requests will fail if db is None
+        
         yield
         client = getattr(app.state, "mongo_client", None)
         if client is not None:

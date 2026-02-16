@@ -18,11 +18,12 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def get_db(request: Request) -> Database:
     db = getattr(request.app.state, "db", None)
     if db is None:
+        # Fallback for tests or if startup failed
         settings = get_settings()
         try:
             client = create_mongo_client(settings.mongodb_uri)
             db = client[settings.mongodb_db]
-            ensure_indexes(db)
+            # DO NOT call ensure_indexes here in request path as it blocks
         except Exception as exc:
             print(f"FAILED TO CONNECT TO MONGODB: {exc}")
             import traceback
