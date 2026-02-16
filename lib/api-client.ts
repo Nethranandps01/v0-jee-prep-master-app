@@ -3,7 +3,9 @@
 const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
 
 export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
+  (typeof window !== "undefined" ? (window as any)._env_?.NEXT_PUBLIC_API_BASE_URL : null) ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  DEFAULT_API_BASE_URL
 ).replace(/\/+$/, "");
 
 export type ApiRole = "admin" | "teacher" | "student";

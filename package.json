@@ -9,6 +9,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -60,6 +62,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22",
     "@types/react": "19.2.7",
