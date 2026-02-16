@@ -36,6 +36,8 @@ export function StudentProgressScreen() {
     studentProgressData?.summary || null,
   );
   const [tests, setTests] = useState<StudentTestResponse[]>(studentProgressData?.tests || []);
+
+  // SWR: Loading is false if we have data
   const [loading, setLoading] = useState(!studentProgressData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -51,6 +53,9 @@ export function StudentProgressScreen() {
       }
 
       setLoading(true);
+      if (!studentProgressData) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
@@ -191,10 +196,10 @@ export function StudentProgressScreen() {
                 <div className="flex items-center gap-2">
                   <Icon
                     className={`h-4 w-4 ${subject.subject === "Physics"
-                        ? "text-primary"
-                        : subject.subject === "Chemistry"
-                          ? "text-accent"
-                          : "text-warning"
+                      ? "text-primary"
+                      : subject.subject === "Chemistry"
+                        ? "text-accent"
+                        : "text-warning"
                       }`}
                   />
                   <span className="text-xs font-semibold text-foreground">{subject.subject}</span>
@@ -206,10 +211,10 @@ export function StudentProgressScreen() {
                       <div className="w-full rounded-t-md bg-muted" style={{ height: "60px" }}>
                         <div
                           className={`w-full rounded-t-md transition-all ${subject.subject === "Physics"
-                              ? "bg-primary/70"
-                              : subject.subject === "Chemistry"
-                                ? "bg-accent/70"
-                                : "bg-warning/70"
+                            ? "bg-primary/70"
+                            : subject.subject === "Chemistry"
+                              ? "bg-accent/70"
+                              : "bg-warning/70"
                             }`}
                           style={{
                             height: `${Math.max(0, Math.min(score, 100))}%`,
@@ -269,10 +274,10 @@ export function StudentProgressScreen() {
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className={`h-full rounded-full transition-all ${topic.mastery >= 85
-                      ? "bg-accent"
-                      : topic.mastery >= 70
-                        ? "bg-primary"
-                        : "bg-warning"
+                    ? "bg-accent"
+                    : topic.mastery >= 70
+                      ? "bg-primary"
+                      : "bg-warning"
                     }`}
                   style={{ width: `${Math.max(0, Math.min(topic.mastery, 100))}%` }}
                 />

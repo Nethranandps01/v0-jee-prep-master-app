@@ -16,9 +16,11 @@ import {
 } from "@/lib/api-client";
 
 export function StudentStudyPlanScreen() {
-    const { navigate, authToken } = useApp();
-    const [studyPlan, setStudyPlan] = useState<StudyPlanResponse | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { navigate, authToken, studentHomeData } = useApp(); // Access cached data
+    // SWR: Initialize from cache if available
+    const [studyPlan, setStudyPlan] = useState<StudyPlanResponse | null>(studentHomeData?.studyPlan || null);
+    // SWR: Loading is false if we have data
+    const [loading, setLoading] = useState(!studentHomeData?.studyPlan);
     const [error, setError] = useState<string | null>(null);
     const [quizModalOpen, setQuizModalOpen] = useState(false);
     const [activeQuizTask, setActiveQuizTask] = useState<StudyPlanTask | null>(null);
@@ -37,6 +39,7 @@ export function StudentStudyPlanScreen() {
                     setError("Failed to load study plan.");
                 }
             } finally {
+                // Only stop loading if we were loading (though setting it false again is harmless)
                 setLoading(false);
             }
         };

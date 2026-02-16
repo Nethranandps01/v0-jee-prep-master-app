@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { configureAuthHandlers, type TokenPairResponse } from "@/lib/api-client";
+import { CacheManager, CacheKeys } from "@/lib/cache-manager"; // Added
 
 export type UserRole = "student" | "teacher" | "admin" | null;
 
@@ -138,6 +139,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAttemptQuestions(null);
     setAttemptAnswers(null);
     setShowAIChat(false);
+    // Clear SWR cache on logout
+    CacheManager.clearAll();
+    setStudentHomeData(null);
+    setStudentProgressData(null);
+    setStudentLibraryData(null);
+    setTeacherHomeData(null);
+    setAdminDashboardData(null);
   }, []);
 
   const navigate = useCallback((newScreen: AppScreen) => {
@@ -236,6 +244,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       configureAuthHandlers(null);
     };
   }, [refreshToken, clearAuth]);
+
+  // -- SWR / Caching Effects --
+
+  // 1. Hydrate from Cache on Mount (or when role changes)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Attempt hydration
+    const cachedHome = CacheManager.load(CacheKeys.STUDENT_HOME);
+    if (cachedHome) setStudentHomeData(cachedHome);
+
+    const cachedProgress = CacheManager.load(CacheKeys.STUDENT_PROGRESS);
+    if (cachedProgress) setStudentProgressData(cachedProgress);
+
+    const cachedLibrary = CacheManager.load(CacheKeys.STUDENT_LIBRARY);
+    if (cachedLibrary) setStudentLibraryData(cachedLibrary);
+
+    const cachedTeacher = CacheManager.load(CacheKeys.TEACHER_HOME);
+    if (cachedTeacher) setTeacherHomeData(cachedTeacher);
+
+    const cachedAdmin = CacheManager.load(CacheKeys.ADMIN_DASHBOARD);
+    if (cachedAdmin) setAdminDashboardData(cachedAdmin);
+
+  }, []); // Run once on mount
+
+  // 2. Persist to Cache on Change
+  useEffect(() => {
+    if (studentHomeData) CacheManager.save(CacheKeys.STUDENT_HOME, studentHomeData);
+  }, [studentHomeData]);
+
+  useEffect(() => {
+    if (studentProgressData) CacheManager.save(CacheKeys.STUDENT_PROGRESS, studentProgressData);
+  }, [studentProgressData]);
+
+  useEffect(() => {
+    if (studentLibraryData) CacheManager.save(CacheKeys.STUDENT_LIBRARY, studentLibraryData);
+  }, [studentLibraryData]);
+
+  useEffect(() => {
+    if (teacherHomeData) CacheManager.save(CacheKeys.TEACHER_HOME, teacherHomeData);
+  }, [teacherHomeData]);
+
+  useEffect(() => {
+    if (adminDashboardData) CacheManager.save(CacheKeys.ADMIN_DASHBOARD, adminDashboardData);
+  }, [adminDashboardData]);
 
   return (
     <AppContext.Provider

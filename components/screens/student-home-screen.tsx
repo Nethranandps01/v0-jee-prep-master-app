@@ -59,6 +59,8 @@ export function StudentHomeScreen() {
   const [summary, setSummary] = useState<StudentHomeSummaryResponse | null>(studentHomeData?.summary || null);
   const [progress, setProgress] = useState<StudentProgressResponse | null>(studentHomeData?.progress || null);
   const [studyPlan, setStudyPlan] = useState<StudyPlanResponse | null>(studentHomeData?.studyPlan || null);
+
+  // SWR: If we have data, we are NOT loading (from the UI perspective)
   const [loading, setLoading] = useState(!studentHomeData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -73,7 +75,10 @@ export function StudentHomeScreen() {
         return;
       }
 
-      setLoading(true);
+      // SWR: Only show loader if we have NO data
+      if (!studentHomeData) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
