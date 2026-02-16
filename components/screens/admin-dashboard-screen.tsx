@@ -45,9 +45,9 @@ const defaultActivityAppearance: ActivityAppearance = {
 };
 
 export function AdminDashboardScreen() {
-  const { userName, navigate, authToken } = useApp();
-  const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { userName, navigate, authToken, adminDashboardData, setAdminDashboardData } = useApp();
+  const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(adminDashboardData || null);
+  const [loading, setLoading] = useState(!adminDashboardData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -69,6 +69,7 @@ export function AdminDashboardScreen() {
         const response = await getAdminDashboard(authToken);
         if (!cancelled) {
           setDashboard(response);
+          setAdminDashboardData(response);
         }
       } catch (err) {
         if (!cancelled) {
@@ -94,7 +95,7 @@ export function AdminDashboardScreen() {
   }, [authToken, reloadKey]);
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6">
+    <div className="flex flex-col gap-6 px-4 py-4">
       {/* Greeting */}
       <div className="animate-fade-in flex flex-col gap-1">
         <p className="text-sm text-muted-foreground">Welcome back,</p>

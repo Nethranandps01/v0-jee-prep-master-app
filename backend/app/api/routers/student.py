@@ -25,6 +25,7 @@ from app.schemas.student import (
 from app.schemas.planner import StudyPlanResponse, UpdateAvailabilityRequest
 from app.services.student_service import StudentService
 from app.services.ai_service import stream_chat_reply
+from app.utils.cache import student_cache  # Added
 
 
 router = APIRouter(
@@ -43,14 +44,19 @@ async def ask_ai_chat(
         stream_chat_reply(payload.query),
         media_type="text/event-stream"
     )
-
 @router.get("/home-summary", response_model=StudentHomeSummaryResponse)
 async def home_summary(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> StudentHomeSummaryResponse:
-    return StudentHomeSummaryResponse(**StudentService.home_summary(db, current_user))
-
+    user_id = str(current_user["_id"])
+    cached = student_cache.get(f"home_{user_id}")
+    if cached:
+        return StudentHomeSummaryResponse(**cached)
+    
+    summary = StudentService.home_summary(db, current_user)
+    student_cache.set(f"home_{user_id}", summary)
+    return StudentHomeSummaryResponse(**summary)
 
 @router.get("/tests", response_model=list[StudentTestResponse])
 async def list_tests(
@@ -97,6 +103,7 @@ async def submit_attempt(
             current_user,
             attempt_id,
             violation_reason=(payload.violation_reason if payload else None),
+            time_spent=(payload.time_spent if payload else None),
         )
     )
 
@@ -115,7 +122,14 @@ async def progress(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> StudentProgressResponse:
-    return StudentProgressResponse(**StudentService.progress(db, current_user))
+    user_id = str(current_user["_id"])
+    cached = student_cache.get(f"progress_{user_id}")
+    if cached:
+        return StudentProgressResponse(**cached)
+        
+    prog = StudentService.progress(db, current_user)
+    student_cache.set(f"progress_{user_id}", prog)
+    return StudentProgressResponse(**prog)
 
 
 @router.get("/library-items", response_model=list[StudentLibraryItemResponse])

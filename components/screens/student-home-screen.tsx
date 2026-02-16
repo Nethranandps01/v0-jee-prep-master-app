@@ -50,14 +50,16 @@ export function StudentHomeScreen() {
     setCompletedTestId,
     studentYear,
     authToken,
+    studentHomeData,
+    setStudentHomeData,
   } = useApp();
   const year = studentYear || "12th";
 
-  const [tests, setTests] = useState<StudentTestResponse[]>([]);
-  const [summary, setSummary] = useState<StudentHomeSummaryResponse | null>(null);
-  const [progress, setProgress] = useState<StudentProgressResponse | null>(null);
-  const [studyPlan, setStudyPlan] = useState<StudyPlanResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tests, setTests] = useState<StudentTestResponse[]>(studentHomeData?.tests || []);
+  const [summary, setSummary] = useState<StudentHomeSummaryResponse | null>(studentHomeData?.summary || null);
+  const [progress, setProgress] = useState<StudentProgressResponse | null>(studentHomeData?.progress || null);
+  const [studyPlan, setStudyPlan] = useState<StudyPlanResponse | null>(studentHomeData?.studyPlan || null);
+  const [loading, setLoading] = useState(!studentHomeData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -87,6 +89,12 @@ export function StudentHomeScreen() {
           setProgress(progressResponse);
           setTests(testsResponse);
           setStudyPlan(planResponse);
+          setStudentHomeData({
+            summary: summaryResponse,
+            progress: progressResponse,
+            tests: testsResponse,
+            studyPlan: planResponse,
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -95,9 +103,6 @@ export function StudentHomeScreen() {
           } else {
             setError("Failed to load dashboard data.");
           }
-          setSummary(null);
-          setProgress(null);
-          setTests([]);
         }
       } finally {
         if (!cancelled) {
@@ -171,7 +176,7 @@ export function StudentHomeScreen() {
   }, [studyPlan]);
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6">
+    <div className="flex flex-col gap-6 px-4 py-4">
       <div className="animate-fade-in flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <p className="text-sm text-muted-foreground">Good morning,</p>

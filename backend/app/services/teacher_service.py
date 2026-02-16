@@ -32,25 +32,34 @@ class TeacherService:
         teacher_id = str(teacher["_id"])
         subject = teacher.get("subject")
 
-        classes = list(db.classes.find({"teacher_id": teacher_id}))
-        unique_student_ids: set[str] = set()
-        fallback_students = 0
-        for cls in classes:
-            if cls.get("student_ids"):
-                for student_id in cls["student_ids"]:
-                    unique_student_ids.add(str(student_id))
-            else:
-                fallback_students += int(cls.get("students", 0))
+        # 1. Total Unique Students across all classes (Aggregation)
+        pipeline = [
+            {"$match": {"teacher_id": teacher_id}},
+            {"$unwind": "$student_ids"},
+            {"$group": {"_id": None, "unique_students": {"$addToSet": "$student_ids"}}},
+            {"$project": {"count": {"$size": "$unique_students"}}}
+        ]
+        res = list(db.classes.aggregate(pipeline))
+        total_students = res[0]["count"] if res else 0
+        
+        # If no explicit student_ids, fallback to the 'students' counter field
+        if total_students == 0:
+            fallback = db.classes.aggregate([
+                {"$match": {"teacher_id": teacher_id}},
+                {"$group": {"_id": None, "total": {"$sum": "$students"}}}
+            ])
+            fallback_res = list(fallback)
+            total_students = fallback_res[0]["total"] if fallback_res else 0
 
-        total_students = len(unique_student_ids) if unique_student_ids else fallback_students
-
+        # 2. Total Papers
         total_papers = db.tests.count_documents({"creator_id": teacher_id})
 
-        pipeline = [
+        # 3. Subject Average
+        avg_pipeline = [
             {"$match": {"subject": subject, "submitted_at": {"$ne": None}}},
             {"$group": {"_id": None, "avg": {"$avg": "$score"}}},
         ]
-        avg_result = list(db.test_attempts.aggregate(pipeline))
+        avg_result = list(db.test_attempts.aggregate(avg_pipeline))
         subject_avg = round(float(avg_result[0]["avg"]), 1) if avg_result else 0.0
 
         return {
@@ -542,7 +551,7 @@ class TeacherService:
         if file_payload:
             db.library_files.insert_one(
                 {
-                    "library_item_id": str(result.inserted_id),
+                    "library_item_id": result.inserted_id,  # Use native ObjectId
                     "filename": file_payload["filename"],
                     "content_type": file_payload["content_type"],
                     "size_bytes": file_payload["size_bytes"],
@@ -559,7 +568,7 @@ class TeacherService:
                 "subject": payload.subject,
                 "date": now.strftime("%b %d, %Y"),
                 "status": initial_status,
-                "library_item_id": str(result.inserted_id),
+                "library_item_id": result.inserted_id,  # Use native ObjectId
                 "teacher_id": str(teacher["_id"]),
                 "created_at": now,
                 "updated_at": now,

@@ -60,7 +60,7 @@ export function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-card/95 px-4 py-3 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-card/95 px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-inset-top))] backdrop-blur-xl">
       <div className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
           <Zap className="h-4 w-4 text-primary-foreground" />

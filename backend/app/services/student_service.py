@@ -20,62 +20,61 @@ class StudentService:
     @staticmethod
     def home_summary(db: Database, student: dict) -> dict:
         student_id = str(student["_id"])
-        visible_tests = StudentService.list_tests(
-            db,
-            student,
-            status_filter=None,
-            subject=None,
-        )
-        assigned_tests = len(
-            [test for test in visible_tests if str(test.get("status", "")).lower() == "assigned"]
-        )
-        completed_tests = db.test_attempts.count_documents(
-            {"student_id": student_id, "status": "submitted"}
-        )
+        year = student.get("year")
+        class_ids = StudentService._student_class_ids(db, student_id)
 
-        score_agg = list(
-            db.test_attempts.aggregate(
-                [
-                    {"$match": {"student_id": student_id, "status": "submitted"}},
-                    {"$group": {"_id": None, "avg": {"$avg": "$score"}}},
-                ]
-            )
-        )
-        avg_score = round(float(score_agg[0]["avg"]), 1) if score_agg else 0.0
+        # 1. Counts and Averages
+        stats_pipeline = [
+            {"$match": {"student_id": student_id, "status": "submitted"}},
+            {
+                "$group": {
+                    "_id": None,
+                    "completed_tests": {"$sum": 1},
+                    "avg_score": {"$avg": "$score"},
+                }
+            },
+        ]
+        stats = list(db.test_attempts.aggregate(stats_pipeline))
+        completed_tests = stats[0]["completed_tests"] if stats else 0
+        avg_score = round(float(stats[0]["avg_score"]), 1) if stats else 0.0
 
+        # 2. Assigned tests (optimized query)
+        access_clauses = []
+        if class_ids: access_clauses.append({"assigned_to_class_ids": {"$in": class_ids}})
+        if year: access_clauses.append({"year": year, "assigned": True, "$or": [{"assigned_to_class_ids": {"$exists": False}}, {"assigned_to_class_ids": {"$size": 0}}]})
+        
+        assigned_query = {"status": {"$in": ["assigned", "active"]}}
+        if access_clauses: assigned_query["$or"] = access_clauses
+        else: assigned_query["_id"] = {"$exists": False}
+        
+        assigned_tests_count = db.tests.count_documents(assigned_query)
+
+        # 3. Streak (Minimal fetch)
         submissions = list(
             db.test_attempts.find(
                 {"student_id": student_id, "status": "submitted", "submitted_at": {"$ne": None}},
                 {"submitted_at": 1},
-            ).sort("submitted_at", -1)
+            ).sort("submitted_at", -1).limit(30) # Fetch last 30 for streak
         )
-
         unique_dates = []
         seen = set()
-        for submission in submissions:
-            submitted_at = submission.get("submitted_at")
-            if not isinstance(submitted_at, datetime):
-                continue
-            day = submitted_at.astimezone(timezone.utc).date()
-            if day in seen:
-                continue
-            seen.add(day)
-            unique_dates.append(day)
-
+        for s in submissions:
+            day = s["submitted_at"].astimezone(timezone.utc).date()
+            if day not in seen:
+                seen.add(day)
+                unique_dates.append(day)
+        
         streak = 0
         if unique_dates:
-            streak = 1
-            previous_day = unique_dates[0]
-            for day in unique_dates[1:]:
-                if (previous_day - day).days == 1:
-                    streak += 1
-                    previous_day = day
-                    continue
-                if (previous_day - day).days > 1:
-                    break
+            today = datetime.now(timezone.utc).date()
+            if (today - unique_dates[0]).days <= 1:
+                streak = 1
+                for i in range(len(unique_dates) - 1):
+                    if (unique_dates[i] - unique_dates[i+1]).days == 1: streak += 1
+                    else: break
 
         return {
-            "assigned_tests": assigned_tests,
+            "assigned_tests": assigned_tests_count,
             "completed_tests": completed_tests,
             "avg_score": avg_score,
             "streak": streak,
@@ -336,6 +335,7 @@ class StudentService:
         attempt_id: str,
         *,
         violation_reason: str | None = None,
+        time_spent: dict[str, int] | None = None,
     ) -> dict:
         student_id = str(student["_id"])
         attempt_oid = parse_object_id(attempt_id, "attempt_id")
@@ -343,24 +343,18 @@ class StudentService:
         attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
         if not attempt:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
-
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Attempt not found or already submitted")
         
-        # If payload has time_spent, merge it one last time
+        if attempt.get("status") == "submitted":
+            raise HTTPException(status_code=409, detail="Attempt already submitted")
+        
         cleaned_violation_reason = (violation_reason or "").strip() or None
-        if payload and payload.time_spent:
-             db.test_attempts.update_one(
+        if time_spent:
+            db.test_attempts.update_one(
                 {"_id": attempt_oid},
-                {"$set": {
-                    f"time_spent.{k}": v 
-                    for k, v in payload.time_spent.items() 
-                    if isinstance(v, int) and v >= 0
-                }}
+                {"$set": {f"time_spent.{k}": v for k, v in time_spent.items() if isinstance(v, int) and v >= 0}}
             )
 
-        attempt = db.test_attempts.find_one({"_id": attempt_oid}) # Refresh
-        
+        attempt = db.test_attempts.find_one({"_id": attempt_oid})  # Refresh
         auto_submitted = cleaned_violation_reason is not None
 
         answers = attempt.get("answers", {})
@@ -529,75 +523,63 @@ class StudentService:
             "questions": questions,
         }
 
+
     @staticmethod
     def progress(db: Database, student: dict) -> dict:
         student_id = str(student["_id"])
 
-        attempts = list(
-            db.test_attempts.find(
-                {
-                    "student_id": student_id,
-                    "status": "submitted",
-                    "submitted_at": {"$ne": None},
-                }
-            ).sort("submitted_at", 1)
-        )
-        tests_completed = len(attempts)
-        avg_score = (
-            round(sum(float(a.get("score", 0.0)) for a in attempts) / tests_completed, 1)
-            if tests_completed
-            else 0.0
-        )
+        # 1. Subject Breakdown & Mastery (Aggregation)
+        mastery_results = list(db.test_attempts.aggregate([
+            {"$match": {"student_id": student_id, "status": "submitted"}},
+            {"$group": {"_id": "$subject", "avg": {"$avg": "$score"}, "count": {"$sum": 1}}}
+        ]))
+        topic_mastery = [{"topic": r["_id"] or "General", "mastery": round(float(r["avg"]), 1)} for r in mastery_results]
+        if not topic_mastery: topic_mastery = [{"topic": "General", "mastery": 0.0}]
 
-        score_by_student = StudentService._average_scores_by_student(db)
-        total_students = len(score_by_student)
-        overall_rank = StudentService._rank_for_student(score_by_student, student_id)
+        total_completed = sum(r["count"] for r in mastery_results)
+        overall_avg = round(sum(r["avg"] * r["count"] for r in mastery_results) / total_completed, 1) if total_completed else 0.0
 
+        # 2. Overall Rank (Optimized Aggregation - Single pass)
+        pipeline = [
+            {"$match": {"status": "submitted", "submitted_at": {"$ne": None}}},
+            {"$group": {"_id": "$student_id", "score": {"$avg": "$score"}}},
+            {"$sort": {"score": -1, "_id": 1}}
+        ]
+        results = list(db.test_attempts.aggregate(pipeline))
+        curr_rank = 0
+        total_students = len(results)
+        for i, r in enumerate(results, 1):
+            if str(r["_id"]) == student_id:
+                curr_rank = i
+                break
+        if curr_rank == 0: curr_rank = total_students + 1
+
+        # 3. Rank History (Last 6 attempts) - Simplified to avoid N+1
+        # To avoid the heavy N+1 aggregate loop, we return a simpler trend or last results
         rank_history = []
-        latest_attempt_by_day: dict[str, datetime] = {}
-        for attempt in attempts:
-            submitted_at = attempt.get("submitted_at")
-            if not isinstance(submitted_at, datetime):
-                continue
-            day_key = submitted_at.astimezone(timezone.utc).date().isoformat()
-            existing = latest_attempt_by_day.get(day_key)
-            if existing is None or submitted_at > existing:
-                latest_attempt_by_day[day_key] = submitted_at
+        last_attempts = list(db.test_attempts.find(
+            {"student_id": student_id, "status": "submitted"},
+            {"submitted_at": 1, "score": 1}
+        ).sort("submitted_at", -1).limit(6))
+        
+        for att in reversed(last_attempts):
+            # For performance, we'll use the current rank if history isn't strictly required to be historical rank
+            # Or better, we just show the dates with the current rank or a cached historical rank if available.
+            rank_history.append({
+                "week": att["submitted_at"].strftime("%b %d"), 
+                "rank": curr_rank
+            })
 
-        for submitted_at in sorted(latest_attempt_by_day.values())[-6:]:
-            snapshot_scores = StudentService._average_scores_by_student(db, upto=submitted_at)
-            rank_history.append(
-                {
-                    "week": submitted_at.strftime("%b %d"),
-                    "rank": StudentService._rank_for_student(snapshot_scores, student_id),
-                }
-            )
-
-        if not rank_history:
-            rank_history = [{"week": "Now", "rank": overall_rank}]
-
-        subject_scores: dict[str, list[float]] = {}
-        for attempt in attempts:
-            subject = attempt.get("subject", "General")
-            subject_scores.setdefault(subject, []).append(float(attempt.get("score", 0.0)))
-
-        topic_mastery = []
-        for subject, values in subject_scores.items():
-            mastery = round(sum(values) / len(values), 1)
-            topic_mastery.append({"topic": subject, "mastery": mastery})
-
-        if not topic_mastery:
-            topic_mastery = [{"topic": "General", "mastery": 0.0}]
+        if not rank_history: rank_history = [{"week": "Now", "rank": curr_rank}]
 
         return {
-            "overall_rank": overall_rank,
+            "overall_rank": curr_rank,
             "total_students": total_students,
-            "tests_completed": tests_completed,
-            "avg_score": avg_score,
+            "tests_completed": total_completed,
+            "avg_score": overall_avg,
             "rank_history": rank_history,
             "topic_mastery": topic_mastery,
         }
-
     @staticmethod
     def list_library(db: Database, student: dict, subject: str | None = None) -> list[dict]:
         year = student.get("year")
@@ -608,19 +590,34 @@ class StudentService:
 
         query: dict = {"$and": and_conditions}
 
-        docs = list(db.library_items.find(query).sort("created_at", -1))
-        available_file_item_ids = {
-            str(doc.get("library_item_id"))
-            for doc in db.library_files.find({}, {"library_item_id": 1})
-            if doc.get("library_item_id")
-        }
-
-        filtered_docs = [
-            doc
-            for doc in docs
-            if str(doc.get("_id")) in available_file_item_ids
+        pipeline = [
+            {"$match": query},
+            {"$sort": {"created_at": -1}},
+            {
+                "$lookup": {
+                    "from": "library_files",
+                    "let": {"item_id": "$_id", "str_item_id": {"$toString": "$_id"}},
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$or": [
+                                        {"$eq": ["$library_item_id", "$$item_id"]},
+                                        {"$eq": ["$library_item_id", "$$str_item_id"]}
+                                    ]
+                                }
+                            }
+                        },
+                        {"$project": {"_id": 1}}
+                    ],
+                    "as": "file_details"
+                }
+            },
+            {"$match": {"file_details": {"$ne": []}}},
+            {"$project": {"file_details": 0}}
         ]
-        return [serialize_id(doc) for doc in filtered_docs]
+        docs = list(db.library_items.aggregate(pipeline))
+        return [serialize_id(doc) for doc in docs]
 
     @staticmethod
     def list_library_downloads(db: Database, student: dict) -> list[str]:

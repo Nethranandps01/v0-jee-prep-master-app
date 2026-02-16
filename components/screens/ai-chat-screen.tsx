@@ -271,7 +271,7 @@ export function AIChatScreen() {
 
       {/* Main Chat Area */}
       <div className="flex flex-1 flex-col h-full relative">
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border/50 bg-background/80 px-4 py-3 backdrop-blur-xl">
+        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border/50 bg-background/80 px-4 pb-3 pt-[calc(0.5rem+var(--safe-area-inset-top))] backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -349,29 +349,31 @@ export function AIChatScreen() {
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-4 ${message.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-300`}
+                  className={`flex w-full ${message.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-300`}
                 >
-                  {message.role === "ai" && (
-                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-violet-600 shadow-md">
-                      <Sparkles className="h-4 w-4 text-white" />
+                  <div className={`flex gap-3 max-w-[85%] ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                    <div className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${message.role === "ai"
+                      ? "bg-gradient-to-br from-primary to-violet-600"
+                      : "bg-muted"
+                      }`}>
+                      {message.role === "ai" ? (
+                        <Sparkles className="h-4 w-4 text-white" />
+                      ) : (
+                        <User className="h-4 w-4 text-foreground/70" />
+                      )}
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-5 py-3.5 shadow-sm text-sm leading-7 ${message.role === "user"
-                      ? "bg-gradient-to-br from-primary to-violet-600 text-primary-foreground rounded-br-sm"
-                      : "bg-card/80 backdrop-blur-sm border border-border/50 text-foreground rounded-bl-sm"
-                      }`}
-                  >
-                    <p className="whitespace-pre-line">
-                      {message.content}
-                      {message.isStreaming && <span className="ml-1 inline-block h-4 w-1.5 align-middle bg-primary animate-pulse" />}
-                    </p>
+                    <div
+                      className={`rounded-2xl px-5 py-3.5 shadow-sm text-sm leading-7 ${message.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-tr-none"
+                        : "bg-card/80 backdrop-blur-sm border border-border/50 text-foreground rounded-tl-none"
+                        }`}
+                    >
+                      <p className="whitespace-pre-line">
+                        {message.content}
+                        {message.isStreaming && <span className="ml-1 inline-block h-4 w-1.5 align-middle bg-primary animate-pulse" />}
+                      </p>
+                    </div>
                   </div>
-                  {message.role === "user" && (
-                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted shadow-sm">
-                      <User className="h-4 w-4 text-foreground/70" />
-                    </div>
-                  )}
                 </div>
               ))}
               {messages.length > 0 && messages[messages.length - 1].role === "ai" && !isTyping && !messages[messages.length - 1].isStreaming && (

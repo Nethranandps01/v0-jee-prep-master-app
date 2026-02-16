@@ -63,14 +63,12 @@ async def stream_call_openai(
 
 async def stream_chat_reply(query: str) -> AsyncGenerator[str, None]:
     prompt = (
-        "You are an expert JEE tutor. Give clear, practical help for the student query.\n"
-        "Rules:\n"
-        "- Keep response concise (3-8 bullet points or short paragraphs).\n"
-        "- Prioritize exam strategy, concept clarity, and common mistakes.\n"
-        "- Keep response complete and self-contained.\n\n"
-        f"Student query: {query}"
+        "Role: Expert JEE Tutor. Task: Help student.\n"
+        "Format: Concise bullets/short paragraphs. Max 5 pts.\n"
+        "Focus: Strategy, clarity, traps.\n"
+        f"Query: {query}"
     )
-    async for chunk in stream_call_openai(prompt, temperature=0.35, max_output_tokens=900):
+    async for chunk in stream_call_openai(prompt, temperature=0.3, max_output_tokens=500):
         yield chunk
 
 # ... (keep existing synchronous functions if needed, or deprecate them)

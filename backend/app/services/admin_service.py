@@ -43,134 +43,75 @@ class AdminService:
     @staticmethod
     def _fallback_recent_activity(db: Database, *, limit: int = 5) -> list[dict]:
         events: list[dict] = []
-        user_name_cache: dict[str, str] = {}
+        user_ids_to_resolve: set[str] = set()
 
-        for test in db.tests.find({}, {"title": 1, "creator_id": 1, "created_at": 1}).sort("created_at", -1).limit(10):
-            created_at = test.get("created_at")
-            if not isinstance(created_at, datetime):
-                continue
-            teacher_name = AdminService._resolve_user_name(db, str(test.get("creator_id") or ""), user_name_cache)
-            events.append(
-                {
-                    "id": str(test.get("_id")),
-                    "text": f"{teacher_name} created paper '{str(test.get('title') or 'Untitled')}'",
-                    "type": "paper",
-                    "created_at": created_at,
-                }
-            )
+        # Gather recent items from multiple collections
+        tests = list(db.tests.find({}, {"title": 1, "creator_id": 1, "created_at": 1}).sort("created_at", -1).limit(limit * 2))
+        attempts = list(db.test_attempts.find({}, {"student_id": 1, "subject": 1, "score": 1, "submitted_at": 1}).sort("submitted_at", -1).limit(limit * 2))
+        contents = list(db.content_items.find({}, {"title": 1, "status": 1, "updated_at": 1, "created_at": 1}).sort("updated_at", -1).limit(limit * 2))
+        downloads = list(db.library_downloads.find({}, {"student_id": 1, "title": 1, "updated_at": 1, "created_at": 1}).sort("updated_at", -1).limit(limit * 2))
+        doubts = list(db.student_doubts.find({}, {"student_id": 1, "created_at": 1}).sort("created_at", -1).limit(limit * 2))
+        feedback_list = list(db.feedback.find({}, {"student_id": 1, "rating": 1, "created_at": 1}).sort("created_at", -1).limit(limit * 2))
 
-        for attempt in (
-            db.test_attempts.find({}, {"student_id": 1, "subject": 1, "score": 1, "submitted_at": 1})
-            .sort("submitted_at", -1)
-            .limit(10)
-        ):
-            submitted_at = attempt.get("submitted_at")
-            if not isinstance(submitted_at, datetime):
-                continue
-            student_name = AdminService._resolve_user_name(db, str(attempt.get("student_id") or ""), user_name_cache)
-            subject = str(attempt.get("subject") or "test")
+        # Build raw events and collect user IDs
+        raw_events = []
+        for test in tests:
+            cid = str(test.get("creator_id") or "")
+            if cid: user_ids_to_resolve.add(cid)
+            raw_events.append({"text_tmpl": "{name} created paper '{title}'", "params": {"title": str(test.get("title") or "Untitled")}, "uid": cid, "type": "paper", "at": test.get("created_at")})
+        
+        for attempt in attempts:
+            sid = str(attempt.get("student_id") or "")
+            if sid: user_ids_to_resolve.add(sid)
             score = attempt.get("score")
-            score_text = ""
-            if isinstance(score, (int, float)):
-                score_text = f" ({round(float(score), 1)}%)"
-            events.append(
-                {
-                    "id": str(attempt.get("_id")),
-                    "text": f"{student_name} submitted {subject} test{score_text}",
-                    "type": "test",
-                    "created_at": submitted_at,
-                }
-            )
+            score_text = f" ({round(float(score), 1)}%)" if isinstance(score, (int, float)) else ""
+            raw_events.append({"text_tmpl": "{name} submitted {subject} test{score_text}", "params": {"subject": str(attempt.get("subject") or "test"), "score_text": score_text}, "uid": sid, "type": "test", "at": attempt.get("submitted_at")})
 
-        for content in (
-            db.content_items.find({}, {"title": 1, "status": 1, "updated_at": 1, "created_at": 1})
-            .sort("updated_at", -1)
-            .limit(10)
-        ):
-            event_time = content.get("updated_at") or content.get("created_at")
-            if not isinstance(event_time, datetime):
-                continue
-            title = str(content.get("title") or "Untitled")
-            status_value = str(content.get("status") or "updated")
-            events.append(
-                {
-                    "id": str(content.get("_id")),
-                    "text": f"Content '{title}' marked {status_value}",
-                    "type": "material",
-                    "created_at": event_time,
-                }
-            )
+        for content in contents:
+            raw_events.append({"text_tmpl": "Content '{title}' marked {status}", "params": {"title": str(content.get("title") or "Untitled"), "status": str(content.get("status") or "updated")}, "uid": None, "type": "material", "at": content.get("updated_at") or content.get("created_at")})
 
-        for download in (
-            db.library_downloads.find({}, {"student_id": 1, "title": 1, "updated_at": 1, "created_at": 1})
-            .sort("updated_at", -1)
-            .limit(10)
-        ):
-            event_time = download.get("updated_at") or download.get("created_at")
-            if not isinstance(event_time, datetime):
-                continue
-            student_name = AdminService._resolve_user_name(db, str(download.get("student_id") or ""), user_name_cache)
-            title = str(download.get("title") or "material")
-            events.append(
-                {
-                    "id": str(download.get("_id")),
-                    "text": f"{student_name} downloaded '{title}'",
-                    "type": "material",
-                    "created_at": event_time,
-                }
-            )
+        for download in downloads:
+            sid = str(download.get("student_id") or "")
+            if sid: user_ids_to_resolve.add(sid)
+            raw_events.append({"text_tmpl": "{name} downloaded '{title}'", "params": {"title": str(download.get("title") or "material")}, "uid": sid, "type": "material", "at": download.get("updated_at") or download.get("created_at")})
 
-        for doubt in (
-            db.student_doubts.find({}, {"student_id": 1, "created_at": 1})
-            .sort("created_at", -1)
-            .limit(10)
-        ):
-            created_at = doubt.get("created_at")
-            if not isinstance(created_at, datetime):
-                continue
-            student_name = AdminService._resolve_user_name(db, str(doubt.get("student_id") or ""), user_name_cache)
-            events.append(
-                {
-                    "id": str(doubt.get("_id")),
-                    "text": f"{student_name} asked a study doubt",
-                    "type": "chat",
-                    "created_at": created_at,
-                }
-            )
+        for doubt in doubts:
+            sid = str(doubt.get("student_id") or "")
+            if sid: user_ids_to_resolve.add(sid)
+            raw_events.append({"text_tmpl": "{name} asked a study doubt", "params": {}, "uid": sid, "type": "chat", "at": doubt.get("created_at")})
 
-        for feedback in (
-            db.feedback.find({}, {"student_id": 1, "rating": 1, "created_at": 1})
-            .sort("created_at", -1)
-            .limit(10)
-        ):
-            created_at = feedback.get("created_at")
-            if not isinstance(created_at, datetime):
-                continue
-            student_name = AdminService._resolve_user_name(db, str(feedback.get("student_id") or ""), user_name_cache)
-            rating = feedback.get("rating")
-            rating_text = ""
-            if isinstance(rating, (int, float)):
-                rating_text = f" ({int(rating)}/5)"
-            events.append(
-                {
-                    "id": str(feedback.get("_id")),
-                    "text": f"{student_name} submitted feedback{rating_text}",
-                    "type": "feedback",
-                    "created_at": created_at,
-                }
-            )
+        for f in feedback_list:
+            sid = str(f.get("student_id") or "")
+            if sid: user_ids_to_resolve.add(sid)
+            rating = f.get("rating")
+            rating_text = f" ({int(rating)}/5)" if isinstance(rating, (int, float)) else ""
+            raw_events.append({"text_tmpl": "{name} submitted feedback{rating_text}", "params": {"rating_text": rating_text}, "uid": sid, "type": "feedback", "at": f.get("created_at")})
 
-        events.sort(key=lambda event: event.get("created_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        # Batch resolve names
+        user_map: dict[str, str] = {}
+        if user_ids_to_resolve:
+            oids = []
+            for uid in user_ids_to_resolve:
+                try: oids.append(parse_object_id(uid, "id"))
+                except: continue
+            if oids:
+                users = db.users.find({"_id": {"$in": oids}}, {"name": 1})
+                for u in users: user_map[str(u["_id"])] = u.get("name", "User")
 
-        return [
-            {
-                "id": event["id"],
-                "text": event["text"],
-                "time": to_relative_time(event["created_at"]),
-                "type": event["type"],
-            }
-            for event in events[:limit]
-        ]
+        # Sort and Format
+        raw_events.sort(key=lambda x: x["at"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        
+        final = []
+        for e in raw_events[:limit]:
+            name = user_map.get(e["uid"], "User") if e["uid"] else ""
+            text = e["text_tmpl"].format(name=name, **e["params"])
+            final.append({
+                "id": f"fallback_{e['at'].timestamp() if e['at'] else 0}",
+                "text": text,
+                "time": to_relative_time(e["at"]),
+                "type": e["type"],
+            })
+        return final
 
     @staticmethod
     def _paginate(total: int, page: int, limit: int) -> PaginationMeta:

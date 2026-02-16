@@ -134,25 +134,16 @@ def _build_template_question_set(subject: str, total_questions: int, difficulty:
 def _build_question_set_with_ai(subject: str, total_questions: int, difficulty: str, topic: str | None = None) -> list[dict]:
     topic_str = f"Topic: {topic}\n" if topic else ""
     prompt = (
-        "Generate JEE-level multiple-choice questions as strict JSON.\n"
-        f"Subject: {subject}\n"
-        f"{topic_str}"
-        f"Difficulty: {difficulty}\n"
-        f"Count: {total_questions}\n\n"
-        "Return ONLY a JSON object (no markdown) in this shape:\n"
-        '{ "questions": [ ... ] }\n'
-        "Each item in `questions` must have:\n"
-        '- "text": string\n'
-        '- "options": array of exactly 4 strings\n'
-        '- "correct": integer 0-3\n'
-        '- "explanation": short string\n'
-        "Make questions unique and exam-relevant."
+        "Role: JEE Question Setter. Task: JSON Questions.\n"
+        f"Subject: {subject}. {topic_str}"
+        f"Difficulty: {difficulty}. Count: {total_questions}.\n\n"
+        "Output: { \"questions\": [ { \"text\": \"\", \"options\": [\"\", \"\", \"\", \"\"], \"correct\": 0-3, \"explanation\": \"\" } ] }\n"
+        "Note: No markdown. Accurate and unique questions."
     )
 
     attempts: list[tuple[float, int]] = [
-        (0.5, 8000),
-        (0.3, 10000),
-        (0.1, 12000),
+        (0.4, 8000), # Reduced attempts for faster failure/fallback
+        (0.2, 10000),
     ]
 
     for temperature, max_output_tokens in attempts:

@@ -26,13 +26,17 @@ import {
 const SUBJECTS = ["Physics", "Chemistry", "Mathematics"] as const;
 
 export function StudentProgressScreen() {
-  const { studentYear, authToken } = useApp();
+  const { studentYear, authToken, studentProgressData, setStudentProgressData } = useApp();
   const year = studentYear || "12th";
 
-  const [progress, setProgress] = useState<StudentProgressResponse | null>(null);
-  const [summary, setSummary] = useState<StudentHomeSummaryResponse | null>(null);
-  const [tests, setTests] = useState<StudentTestResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState<StudentProgressResponse | null>(
+    studentProgressData?.progress || null,
+  );
+  const [summary, setSummary] = useState<StudentHomeSummaryResponse | null>(
+    studentProgressData?.summary || null,
+  );
+  const [tests, setTests] = useState<StudentTestResponse[]>(studentProgressData?.tests || []);
+  const [loading, setLoading] = useState(!studentProgressData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -60,6 +64,11 @@ export function StudentProgressScreen() {
           setProgress(progressResponse);
           setSummary(summaryResponse);
           setTests(testsResponse);
+          setStudentProgressData({
+            progress: progressResponse,
+            summary: summaryResponse,
+            tests: testsResponse,
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -68,9 +77,6 @@ export function StudentProgressScreen() {
           } else {
             setError("Failed to load progress data.");
           }
-          setProgress(null);
-          setSummary(null);
-          setTests([]);
         }
       } finally {
         if (!cancelled) {
@@ -184,13 +190,12 @@ export function StudentProgressScreen() {
               <div key={subject.subject} className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <Icon
-                    className={`h-4 w-4 ${
-                      subject.subject === "Physics"
+                    className={`h-4 w-4 ${subject.subject === "Physics"
                         ? "text-primary"
                         : subject.subject === "Chemistry"
                           ? "text-accent"
                           : "text-warning"
-                    }`}
+                      }`}
                   />
                   <span className="text-xs font-semibold text-foreground">{subject.subject}</span>
                   <span className="ml-auto text-xs font-bold text-primary">{subject.avg.toFixed(1)}% avg</span>
@@ -200,13 +205,12 @@ export function StudentProgressScreen() {
                     <div key={index} className="flex flex-1 flex-col items-center gap-1">
                       <div className="w-full rounded-t-md bg-muted" style={{ height: "60px" }}>
                         <div
-                          className={`w-full rounded-t-md transition-all ${
-                            subject.subject === "Physics"
+                          className={`w-full rounded-t-md transition-all ${subject.subject === "Physics"
                               ? "bg-primary/70"
                               : subject.subject === "Chemistry"
                                 ? "bg-accent/70"
                                 : "bg-warning/70"
-                          }`}
+                            }`}
                           style={{
                             height: `${Math.max(0, Math.min(score, 100))}%`,
                             marginTop: `${60 - (Math.max(0, Math.min(score, 100)) / 100) * 60}px`,
@@ -264,13 +268,12 @@ export function StudentProgressScreen() {
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full rounded-full transition-all ${
-                    topic.mastery >= 85
+                  className={`h-full rounded-full transition-all ${topic.mastery >= 85
                       ? "bg-accent"
                       : topic.mastery >= 70
                         ? "bg-primary"
                         : "bg-warning"
-                  }`}
+                    }`}
                   style={{ width: `${Math.max(0, Math.min(topic.mastery, 100))}%` }}
                 />
               </div>

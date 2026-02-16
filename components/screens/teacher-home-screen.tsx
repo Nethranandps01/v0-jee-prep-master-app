@@ -28,12 +28,12 @@ import {
 } from "lucide-react";
 
 export function TeacherHomeScreen() {
-  const { userName, navigate, teacherSubject, authToken } = useApp();
-  const [summary, setSummary] = useState<TeacherHomeSummaryResponse | null>(null);
-  const [classes, setClasses] = useState<TeacherClassResponse[]>([]);
-  const [papers, setPapers] = useState<TeacherPaperResponse[]>([]);
-  const [lessons, setLessons] = useState<LessonPlanResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { userName, navigate, teacherSubject, authToken, teacherHomeData, setTeacherHomeData } = useApp();
+  const [summary, setSummary] = useState<TeacherHomeSummaryResponse | null>(teacherHomeData?.summary || null);
+  const [classes, setClasses] = useState<TeacherClassResponse[]>(teacherHomeData?.classes || []);
+  const [papers, setPapers] = useState<TeacherPaperResponse[]>(teacherHomeData?.papers || []);
+  const [lessons, setLessons] = useState<LessonPlanResponse[]>(teacherHomeData?.lessons || []);
+  const [loading, setLoading] = useState(!teacherHomeData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -65,6 +65,12 @@ export function TeacherHomeScreen() {
           setClasses(classesRes);
           setPapers(papersRes);
           setLessons(lessonsRes);
+          setTeacherHomeData({
+            summary: summaryRes,
+            classes: classesRes,
+            papers: papersRes,
+            lessons: lessonsRes,
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -73,10 +79,6 @@ export function TeacherHomeScreen() {
           } else {
             setError("Failed to load teacher dashboard.");
           }
-          setSummary(null);
-          setClasses([]);
-          setPapers([]);
-          setLessons([]);
         }
       } finally {
         if (!cancelled) {
@@ -96,7 +98,7 @@ export function TeacherHomeScreen() {
   const recentPapers = useMemo(() => papers.slice(0, 3), [papers]);
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6">
+    <div className="flex flex-col gap-6 px-4 py-4">
       <div className="animate-fade-in flex flex-col gap-1">
         <p className="text-sm text-muted-foreground">Welcome back,</p>
         <h1 className="text-2xl font-bold text-foreground text-balance">{userName || "Teacher"}</h1>
@@ -214,13 +216,12 @@ export function TeacherHomeScreen() {
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div
-                      className={`h-full rounded-full ${
-                        cls.avg_score >= 80
-                          ? "bg-accent"
-                          : cls.avg_score >= 70
+                      className={`h-full rounded-full ${cls.avg_score >= 80
+                        ? "bg-accent"
+                        : cls.avg_score >= 70
                           ? "bg-primary"
                           : "bg-warning"
-                      }`}
+                        }`}
                       style={{ width: `${cls.avg_score}%` }}
                     />
                   </div>
@@ -246,9 +247,9 @@ export function TeacherHomeScreen() {
                     key={lp.id}
                     className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
                   >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
-                    <FolderOpen className="h-6 w-6 text-accent" />
-                  </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
+                      <FolderOpen className="h-6 w-6 text-accent" />
+                    </div>
                     <div className="flex flex-1 flex-col gap-1">
                       <span className="text-sm font-semibold text-foreground">{lp.topic}</span>
                       <div className="flex items-center gap-2">
@@ -257,11 +258,10 @@ export function TeacherHomeScreen() {
                       </div>
                     </div>
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
-                        lp.status === "published"
-                          ? "bg-accent/15 text-accent"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${lp.status === "published"
+                        ? "bg-accent/15 text-accent"
+                        : "bg-muted text-muted-foreground"
+                        }`}
                     >
                       {lp.status}
                     </span>
@@ -303,9 +303,8 @@ export function TeacherHomeScreen() {
                     </div>
                   </div>
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
-                      paper.assigned ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"
-                    }`}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${paper.assigned ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"
+                      }`}
                   >
                     {paper.assigned ? `${paper.students} students` : "Draft"}
                   </span>

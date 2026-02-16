@@ -346,9 +346,10 @@ class PlannerService:
         target_date = plan.get("target_exam_date")
         days_left = (target_date - now).days if target_date else 0
         
-        # Calculate completion rate
-        completion_percent = (completed_tasks / total_tasks * 100) if total_tasks else 0
-        
+        cached = planner_cache.get(f"assess_{student_id}")
+        if cached:
+            return cached
+            
         # AI-based assessment
         prompt = (
             f"Assess the study progress for a JEE student.\n"
@@ -366,13 +367,16 @@ class PlannerService:
             import json
             assessment = json.loads(raw_res)
             assessment["completion_percent"] = round(completion_percent, 1)
+            planner_cache.set(f"assess_{student_id}", assessment)
             return assessment
         except Exception:
-            return {
+            fallback = {
                 "status": "unknown",
                 "success_probability": 0,
-                "recommendation": "Maintain consistency to reach your goals."
+                "recommendation": "Maintain consistency to reach your goals.",
+                "completion_percent": round(completion_percent, 1)
             }
+            return fallback
     @staticmethod
     def bulk_generate_plans(db: Database, jee_date: datetime) -> int:
         """

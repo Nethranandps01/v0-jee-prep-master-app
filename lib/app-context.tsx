@@ -77,6 +77,19 @@ interface AppContextType {
   studentYear: "11th" | "12th" | null;
   setStudentYear: (year: "11th" | "12th" | null) => void;
   navigate: (screen: AppScreen) => void;
+  // Dashboard Caching
+  studentHomeData: any | null;
+  setStudentHomeData: (data: any | null) => void;
+  studentProgressData: any | null;
+  setStudentProgressData: (data: any | null) => void;
+  teacherHomeData: any | null;
+  setTeacherHomeData: (data: any | null) => void;
+  adminDashboardData: any | null;
+  setAdminDashboardData: (data: any | null) => void;
+  studentLibraryData: any | null;
+  setStudentLibraryData: (data: any | null) => void;
+  studentLibraryDownloads: any | null;
+  setStudentLibraryDownloads: (data: any | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -99,6 +112,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [teacherSubject, setTeacherSubject] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [studentYear, setStudentYear] = useState<"11th" | "12th" | null>(null);
+  const [studentHomeData, setStudentHomeData] = useState<any | null>(null);
+  const [studentProgressData, setStudentProgressData] = useState<any | null>(null);
+  const [teacherHomeData, setTeacherHomeData] = useState<any | null>(null);
+  const [adminDashboardData, setAdminDashboardData] = useState<any | null>(null);
+  const [studentLibraryData, setStudentLibraryData] = useState<any | null>(null);
+  const [studentLibraryDownloads, setStudentLibraryDownloads] = useState<any | null>(null);
 
   const clearAuth = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -255,6 +274,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         studentYear,
         setStudentYear,
         navigate,
+        studentHomeData,
+        setStudentHomeData,
+        studentProgressData,
+        setStudentProgressData,
+        teacherHomeData,
+        setTeacherHomeData,
+        adminDashboardData,
+        setAdminDashboardData,
+        studentLibraryData,
+        setStudentLibraryData,
+        studentLibraryDownloads,
+        setStudentLibraryDownloads,
       }}
     >
       {children}

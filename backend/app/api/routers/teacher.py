@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from pydantic import ValidationError
 from pymongo.database import Database
 
+from app.core.config import get_settings
+from app.utils.cache import teacher_cache
 from app.api.deps import get_current_user, get_db, require_roles
 from app.schemas.common import MessageResponse
 from app.schemas.teacher import (
@@ -39,7 +41,14 @@ async def home_summary(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> TeacherHomeSummaryResponse:
-    return TeacherHomeSummaryResponse(**TeacherService.get_home_summary(db, current_user))
+    user_id = str(current_user["_id"])
+    cached = teacher_cache.get(f"home_{user_id}")
+    if cached:
+        return TeacherHomeSummaryResponse(**cached)
+        
+    summary = TeacherService.get_home_summary(db, current_user)
+    teacher_cache.set(f"home_{user_id}", summary)
+    return TeacherHomeSummaryResponse(**summary)
 
 
 @router.get("/papers", response_model=list[TeacherPaperResponse])

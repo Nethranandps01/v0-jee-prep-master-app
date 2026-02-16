@@ -41,7 +41,7 @@ export function BottomNav() {
   if (role === "admin") {
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl" role="navigation" aria-label="Main navigation">
-        <div className="mx-auto grid max-w-lg grid-cols-4 pb-5 pt-2">
+        <div className="mx-auto grid max-w-lg grid-cols-4 pb-[calc(1.25rem+var(--safe-area-inset-bottom))] pt-2">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = screen === tab.screen;
@@ -54,14 +54,12 @@ export function BottomNav() {
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon
-                  className={`h-5 w-5 transition-colors ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
+                  className={`h-5 w-5 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"
+                    }`}
                 />
                 <span
-                  className={`text-[10px] font-medium ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
+                  className={`text-[10px] font-medium ${isActive ? "text-primary" : "text-muted-foreground"
+                    }`}
                 >
                   {tab.label}
                 </span>
@@ -85,7 +83,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl" role="navigation" aria-label="Main navigation">
-      <div className="relative mx-auto grid max-w-lg grid-cols-5 pb-5 pt-2">
+      <div className="relative mx-auto grid max-w-lg grid-cols-5 pb-[calc(1.25rem+var(--safe-area-inset-bottom))] pt-2">
         {tabs.slice(0, 2).map((tab) => {
           const Icon = tab.icon;
           const isActive = screen === tab.screen;
@@ -98,14 +96,12 @@ export function BottomNav() {
               aria-current={isActive ? "page" : undefined}
             >
               <Icon
-                className={`h-5 w-5 transition-colors ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`h-5 w-5 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
               />
               <span
-                className={`text-[10px] font-medium ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`text-[10px] font-medium ${isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
               >
                 {tab.label}
               </span>
@@ -142,14 +138,12 @@ export function BottomNav() {
               aria-current={isActive ? "page" : undefined}
             >
               <Icon
-                className={`h-5 w-5 transition-colors ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`h-5 w-5 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
               />
               <span
-                className={`text-[10px] font-medium ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`text-[10px] font-medium ${isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
               >
                 {tab.label}
               </span>

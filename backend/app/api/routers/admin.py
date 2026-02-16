@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pymongo.database import Database
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_roles, get_current_user
 from app.schemas.admin import (
     AdminDashboardResponse,
     AnalyticsReportResponse,
@@ -16,6 +16,7 @@ from app.schemas.admin import (
 from app.schemas.common import PaginatedResponse
 from app.schemas.user import AdminUserCreateRequest, UserPublic, UserStatusUpdateRequest
 from app.services.admin_service import AdminService
+from app.utils.cache import admin_cache
 
 
 router = APIRouter(
@@ -26,8 +27,17 @@ router = APIRouter(
 
 
 @router.get("/dashboard", response_model=AdminDashboardResponse)
-async def get_dashboard(db: Database = Depends(get_db)) -> AdminDashboardResponse:
-    return AdminDashboardResponse(**AdminService.get_dashboard(db))
+async def get_dashboard(
+    token: str = Depends(get_current_user),
+    db: Database = Depends(get_db),
+) -> AdminDashboardResponse:
+    cached = admin_cache.get("global_dashboard")
+    if cached:
+        return AdminDashboardResponse(**cached)
+        
+    dash = AdminService.get_dashboard(db)
+    admin_cache.set("global_dashboard", dash)
+    return AdminDashboardResponse(**dash)
 
 
 @router.get("/users", response_model=PaginatedResponse[UserPublic])

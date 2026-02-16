@@ -22,14 +22,23 @@ const subjects = ["All", "Physics", "Chemistry", "Mathematics"] as const;
 type SubjectFilter = (typeof subjects)[number];
 
 export function StudentLibraryScreen() {
-  const { studentYear, authToken } = useApp();
+  const {
+    studentYear,
+    authToken,
+    studentLibraryData,
+    setStudentLibraryData,
+    studentLibraryDownloads,
+    setStudentLibraryDownloads,
+  } = useApp();
   const year = studentYear || "12th";
 
   const [activeSubject, setActiveSubject] = useState<SubjectFilter>("All");
   const [search, setSearch] = useState("");
-  const [items, setItems] = useState<StudentLibraryItemResponse[]>([]);
-  const [downloadedIds, setDownloadedIds] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<StudentLibraryItemResponse[]>(studentLibraryData || []);
+  const [downloadedIds, setDownloadedIds] = useState<Record<string, boolean>>(
+    studentLibraryDownloads || {},
+  );
+  const [loading, setLoading] = useState(!studentLibraryData);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -59,12 +68,13 @@ export function StudentLibraryScreen() {
 
         if (!cancelled) {
           setItems(response);
-          setDownloadedIds(
-            downloaded.reduce<Record<string, boolean>>((acc, id) => {
-              acc[id] = true;
-              return acc;
-            }, {}),
-          );
+          setStudentLibraryData(response);
+          const downloadsMap = downloaded.reduce<Record<string, boolean>>((acc, id) => {
+            acc[id] = true;
+            return acc;
+          }, {});
+          setDownloadedIds(downloadsMap);
+          setStudentLibraryDownloads(downloadsMap);
         }
       } catch (err) {
         if (!cancelled) {
@@ -73,7 +83,6 @@ export function StudentLibraryScreen() {
           } else {
             setError("Failed to load library items.");
           }
-          setItems([]);
         }
       } finally {
         if (!cancelled) {
@@ -164,11 +173,10 @@ export function StudentLibraryScreen() {
           <button
             key={subject}
             onClick={() => setActiveSubject(subject)}
-            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-              activeSubject === subject
+            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${activeSubject === subject
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
+              }`}
           >
             {subject}
           </button>
@@ -198,25 +206,23 @@ export function StudentLibraryScreen() {
                 style={{ animationDelay: `${index * 80}ms` }}
               >
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                    item.subject === "Physics"
+                  className={`flex h-12 w-12 items-center justify-center rounded-xl ${item.subject === "Physics"
                       ? "bg-primary/10"
                       : item.subject === "Chemistry"
                         ? "bg-accent/10"
                         : item.subject === "Mathematics"
                           ? "bg-warning/10"
                           : "bg-muted"
-                  }`}
+                    }`}
                 >
                   {item.type === "PDF" || item.type === "DOCX" ? (
                     <FileText
-                      className={`h-6 w-6 ${
-                        item.subject === "Physics"
+                      className={`h-6 w-6 ${item.subject === "Physics"
                           ? "text-primary"
                           : item.subject === "Chemistry"
                             ? "text-accent"
                             : "text-warning"
-                      }`}
+                        }`}
                     />
                   ) : (
                     <BookOpen className="h-6 w-6 text-primary" />
@@ -240,9 +246,8 @@ export function StudentLibraryScreen() {
                     void handleDownload(item);
                   }}
                   disabled={downloadingId === item.id}
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                    isDownloaded ? "bg-accent/15" : "bg-primary/10 hover:bg-primary/20"
-                  }`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${isDownloaded ? "bg-accent/15" : "bg-primary/10 hover:bg-primary/20"
+                    }`}
                   aria-label={isDownloaded ? "Downloaded" : "Download"}
                 >
                   {downloadingId === item.id ? (
