@@ -25,10 +25,21 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    from fastapi import Request
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        if request.method == "OPTIONS":
+            print(f"DEBUG: OPTIONS request to {request.url}")
+            print(f"DEBUG: Headers: {dict(request.headers)}")
+        response = await call_next(request)
+        if response.status_code >= 400:
+            print(f"DEBUG: Response status: {response.status_code} for {request.method} {request.url}")
+        return response
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,  # Must be False if origins is "*"
         allow_methods=["*"],
         allow_headers=["*"],
     )
