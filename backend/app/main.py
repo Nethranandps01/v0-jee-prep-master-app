@@ -19,10 +19,20 @@ def create_app() -> FastAPI:
         try:
             client = create_mongo_client(settings.mongodb_uri)
             db = client[settings.mongodb_db]
-            ensure_indexes(db)
+            
+            # Assign to state IMMEDIATELY so requests can use the pool
             app.state.mongo_client = client
             app.state.db = db
-            print("Successfully connected to MongoDB and ensured indexes.")
+            
+            print("Successfully connected to MongoDB.")
+            
+            # Run index creation safely
+            try:
+                ensure_indexes(db)
+                print("Indexes ensured.")
+            except Exception as idx_err:
+                print(f"Warning: Index creation failed (non-critical): {idx_err}")
+                
         except Exception as e:
             print(f"Failed to connect to MongoDB during startup: {e}")
             # we don't raise here to allow app to start, but requests will fail if db is None
@@ -42,9 +52,7 @@ def create_app() -> FastAPI:
     from fastapi import Request
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
-        if request.method == "OPTIONS":
-            print(f"DEBUG: OPTIONS request to {request.url}")
-            print(f"DEBUG: Headers: {dict(request.headers)}")
+        # OPTIONS logging removed to reduce noise
         response = await call_next(request)
         if response.status_code >= 400:
             print(f"DEBUG: Response status: {response.status_code} for {request.method} {request.url}")
@@ -56,6 +64,7 @@ def create_app() -> FastAPI:
         allow_credentials=False,  # Must be False if origins is "*"
         allow_methods=["*"],
         allow_headers=["*"],
+        max_age=86400,  # Cache preflight requests for 24 hours
     )
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
