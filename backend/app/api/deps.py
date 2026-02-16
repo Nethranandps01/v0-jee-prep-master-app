@@ -24,9 +24,12 @@ async def get_db(request: Request) -> Database:
             db = client[settings.mongodb_db]
             ensure_indexes(db)
         except Exception as exc:
+            print(f"FAILED TO CONNECT TO MONGODB: {exc}")
+            import traceback
+            traceback.print_exc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database connection not available",
+                detail=f"Database connection not available: {str(exc)}",
             ) from exc
 
         request.app.state.mongo_client = client
