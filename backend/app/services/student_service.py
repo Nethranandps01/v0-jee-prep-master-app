@@ -96,13 +96,13 @@ class StudentService:
                 {"student_id": student_id, "status": "submitted"},
             ).sort("submitted_at", -1)
         )
-        latest_submitted_attempt_by_test: dict[str, dict] = {}
+        # Collect all tests to fetch
+        all_test_ids = set()
         for attempt in submitted_attempts:
-            test_id = str(attempt.get("test_id") or "")
-            if not test_id or test_id in latest_submitted_attempt_by_test:
-                continue
-            latest_submitted_attempt_by_test[test_id] = attempt
+            if tid := attempt.get("test_id"):
+                all_test_ids.add(str(tid))
 
+        # Build query for assigned/active tests
         access_clauses: list[dict] = []
         if class_ids:
             access_clauses.append(
@@ -112,7 +112,7 @@ class StudentService:
                 }
             )
         if year:
-            # Legacy fallback for older docs that do not store assigned class IDs.
+            # Legacy fallback
             access_clauses.append(
                 {
                     "assigned": True,
@@ -124,38 +124,50 @@ class StudentService:
                     ],
                 }
             )
-
-        query: dict = {"$or": access_clauses} if access_clauses else {"_id": {"$exists": False}}
+        
+        main_query = {"$or": access_clauses} if access_clauses else {"_id": {"$exists": False}}
         if subject:
-            query["subject"] = subject
+            main_query["subject"] = subject
 
-        tests = list(db.tests.find(query).sort("created_at", -1))
-        loaded_test_ids = {str(test["_id"]) for test in tests}
+        # Fetch assigned tests
+        assigned_tests = list(db.tests.find(main_query).sort("created_at", -1))
+        
+        # Identify which submitted tests are missing from the assigned list
+        assigned_ids = {str(t["_id"]) for t in assigned_tests}
+        missing_ids = [parse_object_id(tid, "test_id") for tid in all_test_ids if tid not in assigned_ids]
+        
+        # Batch fetch missing tests
+        additional_tests = []
+        if missing_ids:
+            missing_query = {"_id": {"$in": missing_ids}}
+            if subject:
+                missing_query["subject"] = subject
+            additional_tests = list(db.tests.find(missing_query))
 
-        # Always include completed tests for which the student has submitted attempts.
-        for test_id in latest_submitted_attempt_by_test:
-            if test_id in loaded_test_ids:
-                continue
-            test_doc = StudentService._find_test_by_id(db, test_id)
-            if not test_doc:
-                continue
-            if subject and test_doc.get("subject") != subject:
-                continue
-            tests.append(test_doc)
-            loaded_test_ids.add(test_id)
-
+        # Combine and sort
+        all_tests = assigned_tests + additional_tests
+        
         def _created_at_key(doc: dict) -> datetime:
             created_at = doc.get("created_at")
             if isinstance(created_at, datetime):
                 return created_at
             return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
-        tests.sort(key=_created_at_key, reverse=True)
+        all_tests.sort(key=_created_at_key, reverse=True)
+
+        # Map attempts for O(1) lookup
+        attempt_map = {
+            str(a.get("test_id")): a 
+            for a in submitted_attempts 
+            if a.get("test_id")
+        }
 
         responses = []
-        for test in tests:
+        for test in all_tests:
             payload = serialize_id(test)
-            attempt = latest_submitted_attempt_by_test.get(payload["id"])
+            test_id = payload["id"]
+            attempt = attempt_map.get(test_id)
+            
             if attempt:
                 payload["score"] = attempt.get("score")
                 payload["attempt_id"] = str(attempt.get("_id"))
@@ -164,10 +176,11 @@ class StudentService:
                 payload["score"] = None
                 payload["attempt_id"] = None
                 payload["status"] = "assigned"
-            responses.append(payload)
+            
+            if status_filter and payload["status"] != status_filter:
+                continue
 
-        if status_filter:
-            responses = [item for item in responses if item.get("status") == status_filter]
+            responses.append(payload)
 
         return responses
 
@@ -539,23 +552,40 @@ class StudentService:
         total_completed = sum(r["count"] for r in mastery_results)
         overall_avg = round(sum(r["avg"] * r["count"] for r in mastery_results) / total_completed, 1) if total_completed else 0.0
 
-        # 2. Overall Rank (Optimized Aggregation - Single pass)
-        pipeline = [
-            {"$match": {"status": "submitted", "submitted_at": {"$ne": None}}},
-            {"$group": {"_id": "$student_id", "score": {"$avg": "$score"}}},
-            {"$sort": {"score": -1, "_id": 1}}
-        ]
-        results = list(db.test_attempts.aggregate(pipeline))
-        curr_rank = 0
-        total_students = len(results)
-        for i, r in enumerate(results, 1):
-            if str(r["_id"]) == student_id:
-                curr_rank = i
-                break
-        if curr_rank == 0: curr_rank = total_students + 1
+        # 2. Overall Rank (Optimized - Count higher scores)
+        # Calculate my average score first
+        my_avg_result = list(db.test_attempts.aggregate([
+            {"$match": {"student_id": student_id, "status": "submitted", "submitted_at": {"$ne": None}}},
+            {"$group": {"_id": None, "score": {"$avg": "$score"}}}
+        ]))
+        my_avg = float(my_avg_result[0]["score"]) if my_avg_result else 0.0
+        
+        # Count students with higher average score
+        # Note regarding performance: Ideally this should be a pre-calculated status on the User model
+        # or a materialized view. For now, we use a slightly better aggregation than fetching all.
+        
+        # Determine total students (approximate active count)
+        total_students = db.users.count_documents({"role": "student", "status": "active"})
 
-        # 3. Rank History (Last 6 attempts) - Simplified to avoid N+1
-        # To avoid the heavy N+1 aggregate loop, we return a simpler trend or last results
+        curr_rank = 1
+        if my_avg > 0:
+            pipeline = [
+                {"$match": {"status": "submitted", "submitted_at": {"$ne": None}}},
+                {"$group": {"_id": "$student_id", "avg_score": {"$avg": "$score"}}},
+                {"$match": {"avg_score": {"$gt": my_avg}}},
+                {"$count": "higher_rank_count"}
+            ]
+            rank_res = list(db.test_attempts.aggregate(pipeline))
+            if rank_res:
+                curr_rank = rank_res[0]["higher_rank_count"] + 1
+        else:
+            # If no score, rank is last
+            curr_rank = total_students if total_students > 0 else 1
+
+        # 3. Rank History (Last 6 attempts) - Simplified
+        # We can just return the score history as a proxy for progress, 
+        # or minimal mock history if real historical rank calculation is too expensive.
+        # Let's return the last 6 test scores.
         rank_history = []
         last_attempts = list(db.test_attempts.find(
             {"student_id": student_id, "status": "submitted"},
@@ -563,14 +593,12 @@ class StudentService:
         ).sort("submitted_at", -1).limit(6))
         
         for att in reversed(last_attempts):
-            # For performance, we'll use the current rank if history isn't strictly required to be historical rank
-            # Or better, we just show the dates with the current rank or a cached historical rank if available.
             rank_history.append({
                 "week": att["submitted_at"].strftime("%b %d"), 
-                "rank": curr_rank
+                "rank": att["score"] # Using score as the y-axis metric for now as it's more useful
             })
 
-        if not rank_history: rank_history = [{"week": "Now", "rank": curr_rank}]
+        if not rank_history: rank_history = [{"week": "Now", "rank": 0}]
 
         return {
             "overall_rank": curr_rank,
@@ -991,39 +1019,6 @@ class StudentService:
             )
         return payload
 
-    @staticmethod
-    def _average_scores_by_student(db: Database, upto: datetime | None = None) -> dict[str, float]:
-        active_students = list(
-            db.users.find({"role": "student", "status": "active"}, {"_id": 1})
-        )
-        scores_map: dict[str, list[float]] = {str(user["_id"]): [] for user in active_students}
-
-        query: dict = {"status": "submitted", "submitted_at": {"$ne": None}}
-        if upto is not None:
-            query["submitted_at"]["$lte"] = upto
-
-        attempts = db.test_attempts.find(query, {"student_id": 1, "score": 1})
-        for attempt in attempts:
-            sid = str(attempt.get("student_id"))
-            if sid not in scores_map:
-                continue
-            scores_map[sid].append(float(attempt.get("score", 0.0)))
-
-        return {
-            sid: (round(sum(values) / len(values), 1) if values else 0.0)
-            for sid, values in scores_map.items()
-        }
-
-    @staticmethod
-    def _rank_for_student(score_by_student: dict[str, float], student_id: str) -> int:
-        if student_id not in score_by_student:
-            score_by_student[student_id] = 0.0
-
-        ranked = sorted(score_by_student.items(), key=lambda item: (-item[1], item[0]))
-        for index, (sid, _) in enumerate(ranked, start=1):
-            if sid == student_id:
-                return index
-        return max(1, len(ranked))
 
     @staticmethod
     def _normalize_answer(value: object) -> int | None:

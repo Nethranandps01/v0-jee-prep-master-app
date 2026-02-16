@@ -18,6 +18,10 @@ def ensure_indexes(db: Database) -> None:
     db.test_attempts.create_index([("submitted_at", -1)])
     db.test_attempts.create_index([("subject", 1), ("submitted_at", -1)])
     db.test_attempts.create_index([("score", 1)])
+    # Added for optimized leaderboard aggregation
+    db.test_attempts.create_index([("status", 1), ("submitted_at", -1), ("score", -1)]) 
+    
+    db.tests.create_index([("created_at", -1)])
 
     db.content_items.create_index([("status", 1), ("subject", 1), ("created_at", -1)])
     db.classes.create_index([("teacher_id", 1), ("created_at", -1)])
