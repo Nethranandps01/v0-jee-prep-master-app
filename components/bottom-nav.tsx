@@ -73,13 +73,6 @@ export function BottomNav() {
 
   const tabs = role === "teacher" ? teacherTabs : studentTabs;
 
-  const fabAction = () => {
-    if (role === "teacher") {
-      navigate("teacher-paper-generator");
-    } else {
-      navigate("student-tests");
-    }
-  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl" role="navigation" aria-label="Main navigation">
@@ -111,18 +104,14 @@ export function BottomNav() {
 
         <div className="flex flex-col items-center justify-end">
           <button
-            onClick={fabAction}
+            onClick={() => navigate(role === "teacher" ? "teacher-paper-generator" : "ai-chat")}
             className="-mt-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/30 transition-transform active:scale-95"
-            aria-label={role === "teacher" ? "Generate Paper" : "Start Test"}
+            aria-label={role === "teacher" ? "Generate Paper" : "AI Assistant"}
           >
-            {role === "teacher" ? (
-              <Sparkles className="h-6 w-6 text-primary-foreground" />
-            ) : (
-              <Plus className="h-6 w-6 text-primary-foreground" />
-            )}
+            <Sparkles className="h-6 w-6 text-primary-foreground" />
           </button>
           <span className="mt-1 text-[10px] font-medium text-primary">
-            {role === "teacher" ? "Generate" : "Test"}
+            {role === "teacher" ? "Generate" : "AI"}
           </span>
         </div>
 
