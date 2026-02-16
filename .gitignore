@@ -43,3 +43,6 @@ backend/.env/
 backend/backend.trace
 curl_out.txt
 
+# Databases
+.mongodb/
+
