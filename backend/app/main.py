@@ -49,7 +49,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from fastapi import Request
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
         # OPTIONS logging removed to reduce noise

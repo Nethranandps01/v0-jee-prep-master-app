@@ -1,6 +1,6 @@
 "use client";
 
-const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
+const DEFAULT_API_BASE_URL = "http://192.168.0.154:8000/api/v1";
 const PRODUCTION_API_URL = "https://jpm-backend.onrender.com/api/v1";
 
 export const API_BASE_URL = (

@@ -261,7 +261,13 @@ export function AuthScreen() {
               <p className="text-sm text-muted-foreground">{roleLabels[selectedRole]}</p>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleLogin();
+              }}
+              className="flex flex-col gap-4"
+            >
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -270,8 +276,8 @@ export function AuthScreen() {
                     setAuthError(null);
                   }}
                   className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${mode === "signin"
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border bg-card text-muted-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-muted-foreground"
                     }`}
                 >
                   Sign In
@@ -285,8 +291,8 @@ export function AuthScreen() {
                   }}
                   disabled={selectedRole === "admin"}
                   className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${mode === "signup"
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border bg-card text-muted-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-muted-foreground"
                     }`}
                 >
                   Sign Up
@@ -327,7 +333,9 @@ export function AuthScreen() {
                   </Label>
                   <Input
                     id="name"
+                    name="name"
                     type="text"
+                    autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="rounded-xl border-border bg-card py-5 text-foreground placeholder:text-muted-foreground"
@@ -342,6 +350,7 @@ export function AuthScreen() {
                 </Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   autoComplete="username"
                   value={email}
@@ -357,6 +366,7 @@ export function AuthScreen() {
                 </Label>
                 <Input
                   id="password"
+                  name="password"
                   type="password"
                   autoComplete="current-password"
                   value={password}
@@ -408,7 +418,7 @@ export function AuthScreen() {
               )}
 
               <Button
-                onClick={handleLogin}
+                type="submit"
                 disabled={isSubmitting}
                 className="mt-2 w-full gap-2 rounded-2xl bg-primary py-6 text-base font-semibold text-primary-foreground"
                 size="lg"
@@ -422,7 +432,7 @@ export function AuthScreen() {
                     : "Sign In"}
                 <ArrowRight className="h-5 w-5" />
               </Button>
-            </div>
+            </form>
           </div>
         )}
       </div>
