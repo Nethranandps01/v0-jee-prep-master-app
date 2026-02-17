@@ -226,11 +226,11 @@ export function AIChatScreen() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background/50">
-      <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-background to-background blur-3xl" />
+    <div className="flex h-screen w-full overflow-hidden bg-background">
+      {/* Removed heavy radial gradient and blur-3xl for mobile performance */}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border/50 bg-background/95 backdrop-blur-xl transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border bg-background transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-full flex-col p-4">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">History</h2>
@@ -248,7 +248,7 @@ export function AIChatScreen() {
             {sessions.map(session => (
               <div
                 key={session.id}
-                className={`group flex items-center justify-between w-full rounded-lg px-3 py-2 text-sm transition-colors ${currentSessionId === session.id ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+                className={`group flex items-center justify-between w-full rounded-lg px-3 py-2 text-sm transition-colors ${currentSessionId === session.id ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
               >
                 <button
                   onClick={() => handleSessionSelect(session.id)}
@@ -270,12 +270,12 @@ export function AIChatScreen() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex flex-1 flex-col h-full relative">
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border/50 bg-background/80 px-4 pb-3 pt-[calc(0.5rem+var(--safe-area-inset-top))] backdrop-blur-xl">
+      <div className="flex flex-1 flex-col h-full relative bg-background">
+        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background px-4 pb-3 pt-[calc(0.5rem+var(--safe-area-inset-top))]">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/50 transition-colors"
+              className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted transition-colors"
             >
               <span className="sr-only">Toggle History</span>
               {/* Menu Icon */}
@@ -283,14 +283,14 @@ export function AIChatScreen() {
             </button>
             <button
               onClick={goBack}
-              className="hidden md:flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/50 transition-colors"
+              className="hidden md:flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted transition-colors"
               aria-label="Go back"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-lg shadow-primary/20">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                <Sparkles className="h-5 w-5" />
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-bold text-foreground">AI Tutor (JEE)</span>
@@ -305,7 +305,7 @@ export function AIChatScreen() {
             variant="ghost"
             size="sm"
             onClick={goBack}
-            className="md:hidden rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            className="md:hidden rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             Exit
           </Button>
@@ -313,11 +313,10 @@ export function AIChatScreen() {
 
         <div className="flex-1 overflow-y-auto p-4 pb-32">
           {currentSessionId === null && messages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-8 animate-in fade-in zoom-in duration-500">
+            <div className="flex h-full flex-col items-center justify-center gap-8 animate-in fade-in zoom-in duration-300">
               <div className="relative">
-                <div className="absolute -inset-4 rounded-full bg-primary/20 blur-xl animate-pulse" />
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-violet-600 shadow-xl shadow-primary/30">
-                  <Sparkles className="h-10 w-10 text-white" />
+                <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-primary-foreground shadow-xl">
+                  <Sparkles className="h-10 w-10" />
                 </div>
               </div>
               <div className="flex flex-col items-center gap-2 text-center">
@@ -335,11 +334,9 @@ export function AIChatScreen() {
                     onClick={() => {
                       void handleSend(question);
                     }}
-                    className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 px-5 py-4 text-left text-sm text-foreground shadow-sm transition-all hover:border-primary/50 hover:shadow-md hover:bg-card"
-                    style={{ animationDelay: `${i * 100}ms` }}
+                    className="group relative overflow-hidden rounded-2xl border border-border bg-card px-5 py-4 text-left text-sm text-foreground shadow-sm transition-all hover:border-primary hover:shadow-md"
                   >
                     <span className="relative z-10">{question}</span>
-                    <div className="absolute inset-0 bg-primary/5 opacity-0 transition-opacity group-hover:opacity-100" />
                   </button>
                 ))}
               </div>
@@ -349,15 +346,15 @@ export function AIChatScreen() {
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex w-full ${message.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-300`}
+                  className={`flex w-full ${message.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-200`}
                 >
                   <div className={`flex gap-3 max-w-[85%] ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
                     <div className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${message.role === "ai"
-                      ? "bg-gradient-to-br from-primary to-violet-600"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-muted"
                       }`}>
                       {message.role === "ai" ? (
-                        <Sparkles className="h-4 w-4 text-white" />
+                        <Sparkles className="h-4 w-4" />
                       ) : (
                         <User className="h-4 w-4 text-foreground/70" />
                       )}
@@ -365,7 +362,7 @@ export function AIChatScreen() {
                     <div
                       className={`rounded-2xl px-5 py-3.5 shadow-sm text-sm leading-7 ${message.role === "user"
                         ? "bg-primary text-primary-foreground rounded-tr-none"
-                        : "bg-card/80 backdrop-blur-sm border border-border/50 text-foreground rounded-tl-none"
+                        : "bg-card border border-border text-foreground rounded-tl-none"
                         }`}
                     >
                       <p className="whitespace-pre-line">
@@ -377,7 +374,7 @@ export function AIChatScreen() {
                 </div>
               ))}
               {messages.length > 0 && messages[messages.length - 1].role === "ai" && !isTyping && !messages[messages.length - 1].isStreaming && (
-                <div className="flex flex-wrap gap-2 pl-12 animate-in fade-in duration-500">
+                <div className="flex flex-wrap gap-2 pl-12 animate-in fade-in duration-300">
                   {learningPrompts.map((prompt) => (
                     <button
                       key={prompt}
@@ -401,14 +398,14 @@ export function AIChatScreen() {
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/90 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
           <div className="mx-auto max-w-3xl">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleSend();
               }}
-              className="flex items-center gap-2 rounded-3xl border border-border/50 bg-background/80 p-2 shadow-xl shadow-primary/5 backdrop-blur-2xl transition-all focus-within:border-primary/50 focus-within:shadow-2xl focus-within:shadow-primary/10"
+              className="flex items-center gap-2 rounded-3xl border border-border bg-background p-2 shadow-lg transition-all focus-within:border-primary focus-within:shadow-xl"
             >
               <Input
                 value={input}

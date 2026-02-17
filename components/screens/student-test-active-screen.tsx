@@ -399,7 +399,7 @@ export function StudentTestActiveScreen() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background pb-[env(safe-area-inset-bottom)]">
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-card/95 px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))] backdrop-blur-xl">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))]">
         <button
           onClick={() => setShowSubmitConfirm(true)}
           className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"
@@ -490,7 +490,7 @@ export function StudentTestActiveScreen() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card/95 px-4 py-4 backdrop-blur-xl">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background px-4 py-4">
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
