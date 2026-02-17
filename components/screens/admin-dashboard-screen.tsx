@@ -8,6 +8,7 @@ import {
   getAdminDashboard,
   setGlobalJeeDate,
 } from "@/lib/api-client";
+import { CacheManager, CacheKeys } from "@/lib/cache-manager";
 import {
   Users,
   GraduationCap,
@@ -62,7 +63,17 @@ export function AdminDashboardScreen() {
         return;
       }
 
-      setLoading(true);
+      // 1. Try to load from cache first for instant UI
+      if (loading) { // Only check cache on initial load to prevent flickering on manual retries
+        const cached = CacheManager.load<AdminDashboardResponse>(CacheKeys.ADMIN_DASHBOARD);
+        if (cached) {
+          setDashboard(cached);
+          setAdminDashboardData(cached);
+          setLoading(false); // Show UI immediately
+        }
+      }
+
+      // 2. Fetch fresh data (SWR)
       setError(null);
 
       try {
@@ -70,20 +81,27 @@ export function AdminDashboardScreen() {
         if (!cancelled) {
           setDashboard(response);
           setAdminDashboardData(response);
+          CacheManager.save(CacheKeys.ADMIN_DASHBOARD, response);
+          setLoading(false);
         }
       } catch (err) {
         if (!cancelled) {
-          setDashboard(null);
-          if (err instanceof ApiError) {
-            setError(err.detail);
-          } else {
-            setError("Failed to load dashboard.");
+          // If we have cached data, we can stay on it but show a subtle error or just log it?
+          // For now, if we have cache, we don't clear it.
+          const currentData = CacheManager.load<AdminDashboardResponse>(CacheKeys.ADMIN_DASHBOARD);
+          if (!currentData) {
+            setDashboard(null);
+            if (err instanceof ApiError) {
+              setError(err.detail);
+            } else {
+              setError("Failed to load dashboard.");
+            }
           }
         }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      }
+      // Note: We don't set loading(false) in finally if we already did it after cache load.
+      if (!cancelled) {
+        setLoading(false);
       }
     };
 

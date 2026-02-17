@@ -143,17 +143,17 @@ export function AuthScreen() {
       const tokens =
         mode === "signin"
           ? await loginWithPassword({
-              email: normalizedEmail,
-              password,
-            })
+            email: normalizedEmail,
+            password,
+          })
           : await registerWithPassword({
-              name: name.trim(),
-              email: normalizedEmail,
-              password,
-              role: selectedRole === "teacher" ? "teacher" : "student",
-              subject: selectedRole === "teacher" ? subject : undefined,
-              year: selectedRole === "student" ? year : undefined,
-            });
+            name: name.trim(),
+            email: normalizedEmail,
+            password,
+            role: selectedRole === "teacher" ? "teacher" : "student",
+            subject: selectedRole === "teacher" ? subject : undefined,
+            year: selectedRole === "student" ? year : undefined,
+          });
 
       const me = await fetchCurrentUser(tokens.access_token);
       if (me.role !== selectedRole) {
@@ -175,8 +175,8 @@ export function AuthScreen() {
         me.role === "admin"
           ? "admin-dashboard"
           : me.role === "teacher"
-          ? "teacher-home"
-          : "student-home",
+            ? "teacher-home"
+            : "student-home",
       );
     } catch (error) {
       if (error instanceof ApiError) {
@@ -269,11 +269,10 @@ export function AuthScreen() {
                     setMode("signin");
                     setAuthError(null);
                   }}
-                  className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${
-                    mode === "signin"
+                  className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${mode === "signin"
                       ? "bg-primary text-primary-foreground"
                       : "border border-border bg-card text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   Sign In
                 </button>
@@ -285,11 +284,10 @@ export function AuthScreen() {
                     setAuthError(null);
                   }}
                   disabled={selectedRole === "admin"}
-                  className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    mode === "signup"
+                  className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${mode === "signup"
                       ? "bg-primary text-primary-foreground"
                       : "border border-border bg-card text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   Sign Up
                 </button>
@@ -345,6 +343,7 @@ export function AuthScreen() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="rounded-xl border-border bg-card py-5 text-foreground placeholder:text-muted-foreground"
@@ -359,6 +358,7 @@ export function AuthScreen() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="rounded-xl border-border bg-card py-5 text-foreground placeholder:text-muted-foreground"
@@ -418,8 +418,8 @@ export function AuthScreen() {
                     ? "Creating Account..."
                     : "Signing In..."
                   : mode === "signup"
-                  ? "Create Account"
-                  : "Sign In"}
+                    ? "Create Account"
+                    : "Sign In"}
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </div>

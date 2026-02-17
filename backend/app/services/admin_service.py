@@ -398,16 +398,74 @@ class AdminService:
         )
         pass_rate = round((attempts_pass / attempts_total) * 100, 1) if attempts_total else 0.0
 
+        # Optimize Departments: Single Aggregation
+        # 1. Subject Stats (Avg Score, Teacher Count)
+        subject_stats_pipeline = [
+            {
+                "$facet": {
+                    "attempts": [
+                        {"$match": {"submitted_at": {"$ne": None}, "subject": {"$in": SUBJECTS}}},
+                        {"$group": {"_id": "$subject", "avg": {"$avg": "$score"}}}
+                    ],
+                    "teachers": [
+                        {"$match": {"role": "teacher", "status": "active", "subject": {"$in": SUBJECTS}}},
+                        {"$group": {"_id": "$subject", "count": {"$sum": 1}}}
+                    ],
+                    "classes": [
+                         # This approximates student count by subject-based classes
+                        {"$match": {"subject": {"$in": SUBJECTS}}},
+                        {"$unwind": "$students"}, # Assuming 'students' field holds int count or list
+                        {"$group": {"_id": "$subject", "total_students": {"$sum": "$students"}}} 
+                        # Note: This simple sum might double count if a student is in multiple classes of same subject?
+                        # But typically 1 class per subject per student.
+                        # Actually, looking at `classes` schema, it has `student_ids` (array) or `students` (int).
+                        # Let's use a safer approach for student count if possible, but for performance, 
+                        # fetching distinct student IDs might be heavy. 
+                        # Let's stick to the previous logic but inside python for now to avoid complexity risk
+                        # OR keep the student count separate if it's complex.
+                    ]
+                }
+            }
+        ]
+        
+        # Actually, let's keep it simple: 
+        # The teacher count and avg score queries are N+1 (3 subjects * 2 queries = 6).
+        # We can reduce 6 queries to 1 aggregation or just batch them.
+        # But given constraints, let's just optimize the _student_count_for_subject which scans all classes.
+        
         departments = []
         for subject in SUBJECTS:
+            # Teachers: fast index count
+            t_count = db.users.count_documents({"role": "teacher", "status": "active", "subject": subject})
+            
+            # Avg Score: use specific aggregation for just this subject (fast enough with index)
+            # or optimize globally?
+            # Let's use the existing helper but maybe cache it?
+            avg = AdminService._avg_score_for_subject(db, subject)
+            
+            # Student Count: This is the slow one (scans all classes).
+            # Optimize: db.classes.aggregate([ match subject, project count, group sum ])
+            s_count_res = list(db.classes.aggregate([
+                {"$match": {"subject": subject}},
+                {"$project": {
+                    "count": {
+                        "$cond": {
+                            "if": {"$isArray": "$student_ids"},
+                            "then": {"$size": "$student_ids"},
+                            "else": {"$ifNull": ["$students", 0]}
+                        }
+                    }
+                }},
+                {"$group": {"_id": None, "total": {"$sum": "$count"}}}
+            ]))
+            s_count = s_count_res[0]["total"] if s_count_res else 0
+
             departments.append(
                 {
                     "subject": subject,
-                    "teachers": db.users.count_documents(
-                        {"role": "teacher", "status": "active", "subject": subject}
-                    ),
-                    "students": AdminService._student_count_for_subject(db, subject),
-                    "avg_score": AdminService._avg_score_for_subject(db, subject),
+                    "teachers": t_count,
+                    "students": s_count,
+                    "avg_score": avg,
                 }
             )
 

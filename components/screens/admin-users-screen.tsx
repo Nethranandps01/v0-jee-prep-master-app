@@ -11,6 +11,7 @@ import {
   listAdminUsers,
   updateAdminUserStatus,
 } from "@/lib/api-client";
+import { CacheManager, CacheKeys } from "@/lib/cache-manager";
 import {
   Users,
   Search,
@@ -74,7 +75,23 @@ export function AdminUsersScreen() {
         return;
       }
 
-      setLoading(true);
+      const isDefaultView = activeTab === "all" && !debouncedSearch;
+
+      // 1. Try cache if default view
+      if (loading && isDefaultView) {
+        const cached = CacheManager.load<UserPublic[]>(CacheKeys.ADMIN_USERS);
+        if (cached) {
+          setUsers(cached);
+          setLoading(false);
+        }
+      }
+
+      if (!isDefaultView && loading) {
+        // For non-default views, we might not have cache, or we want to show loading
+        // But if we already have users (from a previous tab switch), we might not want to show hard loading?
+        // For now, let's keep loading=true behavior for filters to show activity.
+      }
+
       setError(null);
       setActionError(null);
 
@@ -89,6 +106,10 @@ export function AdminUsersScreen() {
         if (!cancelled) {
           const visibleUsers = response.items.filter((user) => user.role !== "admin");
           setUsers(visibleUsers);
+          if (isDefaultView) {
+            CacheManager.save(CacheKeys.ADMIN_USERS, visibleUsers);
+          }
+          setLoading(false);
         }
       } catch (err) {
         if (!cancelled) {
@@ -97,7 +118,16 @@ export function AdminUsersScreen() {
           } else {
             setError("Failed to load users.");
           }
-          setUsers([]);
+          // Only clear users if we don't have cache/existing data?
+          // For now, let's play safe and not clear if we have cache, *unless* it was a filter search that failed.
+          if (!isDefaultView) {
+            setUsers([]);
+          } else {
+            // If default view failed but we have cache, we might keep showing cache?
+            // But existing logic cleared it. Let's rely on cache if available.
+            const cached = CacheManager.load<UserPublic[]>(CacheKeys.ADMIN_USERS);
+            if (!cached) setUsers([]);
+          }
         }
       } finally {
         if (!cancelled) {
@@ -242,11 +272,10 @@ export function AdminUsersScreen() {
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-medium transition-colors ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-card text-muted-foreground"
-              }`}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-medium transition-colors ${isActive
+                ? "bg-primary text-primary-foreground"
+                : "border border-border bg-card text-muted-foreground"
+                }`}
             >
               <Icon className="h-3.5 w-3.5" />
               {tab.label}
@@ -289,11 +318,10 @@ export function AdminUsersScreen() {
                   className="flex items-center gap-3 p-3 text-left"
                 >
                   <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                      user.role === "teacher"
-                        ? "bg-accent/15 text-accent"
-                        : "bg-primary/15 text-primary"
-                    }`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${user.role === "teacher"
+                      ? "bg-accent/15 text-accent"
+                      : "bg-primary/15 text-primary"
+                      }`}
                   >
                     {user.name.charAt(0)}
                   </div>
@@ -301,11 +329,10 @@ export function AdminUsersScreen() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground">{user.name}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                          user.status === "active"
-                            ? "bg-accent/15 text-accent"
-                            : "bg-muted text-muted-foreground"
-                        }`}
+                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${user.status === "active"
+                          ? "bg-accent/15 text-accent"
+                          : "bg-muted text-muted-foreground"
+                          }`}
                       >
                         {user.status}
                       </span>
@@ -354,11 +381,10 @@ export function AdminUsersScreen() {
                     <button
                       onClick={() => toggleStatus(user)}
                       disabled={statusUpdatingUserId === user.id}
-                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                        user.status === "active"
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-accent/10 text-accent"
-                      }`}
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${user.status === "active"
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-accent/10 text-accent"
+                        }`}
                     >
                       {statusUpdatingUserId === user.id ? (
                         "Updating..."

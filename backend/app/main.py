@@ -67,6 +67,32 @@ def create_app() -> FastAPI:
         max_age=86400,  # Cache preflight requests for 24 hours
     )
 
+    from starlette.types import ASGIApp, Scope, Receive, Send
+    from fastapi.middleware.gzip import GZipMiddleware
+
+    class SelectiveGZipMiddleware:
+        def __init__(self, app: ASGIApp, minimum_size: int = 1000, excluded_paths: list[str] = None):
+            self.app = app
+            self.gzip_app = GZipMiddleware(app, minimum_size=minimum_size)
+            self.excluded_paths = excluded_paths or []
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] == "http":
+                path = scope.get("path", "")
+                for excluded in self.excluded_paths:
+                    if excluded in path:
+                        await self.app(scope, receive, send)
+                        return
+            
+            await self.gzip_app(scope, receive, send)
+
+    # Exclude AI streaming endpoints from GZip to prevent buffering
+    app.add_middleware(
+        SelectiveGZipMiddleware, 
+        minimum_size=1000, 
+        excluded_paths=["/chat/ask", "/doubts/ask"]
+    )
+
     app.include_router(api_router, prefix=settings.api_v1_prefix)
 
     @app.get("/")

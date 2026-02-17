@@ -9,6 +9,7 @@ export const CacheKeys = {
     STUDENT_LIBRARY: "student_library",
     TEACHER_HOME: "teacher_home",
     ADMIN_DASHBOARD: "admin_dashboard",
+    ADMIN_USERS: "admin_users_list",
 };
 
 export const CacheManager = {
