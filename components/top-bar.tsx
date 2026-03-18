@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/app-context";
 import { listNotifications } from "@/lib/api-client";
 import { useTheme } from "next-themes";
-import { Bell, Search, Sun, Moon, Zap, UserCircle } from "lucide-react";
+import { ArrowLeft, Bell, Search, Sun, Moon, Rocket, UserCircle } from "lucide-react";
 
 export function TopBar() {
   const { navigate, role, authToken, screen } = useApp();
   const { theme, setTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -19,6 +20,12 @@ export function TopBar() {
         setUnreadCount(0);
         return;
       }
+
+      // Avoid duplicate initial fetch in React Strict Mode; still re-run when screen changes.
+      if (hasFetchedRef.current && screen) {
+        return;
+      }
+      hasFetchedRef.current = true;
 
       try {
         const items = await listNotifications(authToken);
@@ -59,14 +66,69 @@ export function TopBar() {
     }
   };
 
+  const backTarget = (() => {
+    switch (screen) {
+      // Student
+      case "student-results":
+      case "student-feedback":
+        return "student-home";
+      case "student-profile":
+        return "student-home";
+      case "student-tests":
+      case "student-library":
+      case "student-progress":
+      case "student-study-plan":
+      case "notifications":
+        return "student-home";
+
+      // Teacher
+      case "teacher-tests":
+      case "teacher-paper-generator":
+      case "teacher-library":
+      case "teacher-upload":
+      case "teacher-profile":
+      case "teacher-lesson-plans":
+        return "teacher-home";
+      case "teacher-classes":
+        return "teacher-home";
+      case "teacher-student-details":
+        return "teacher-classes";
+
+      // Admin
+      case "admin-profile":
+      case "admin-users":
+      case "admin-content":
+      case "admin-reports":
+        return "admin-dashboard";
+
+      default:
+        return null;
+    }
+  })();
+
+  const showBack =
+    Boolean(backTarget) &&
+    screen !== "student-home" &&
+    screen !== "teacher-home" &&
+    screen !== "admin-dashboard";
+
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-card/95 px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-inset-top))] backdrop-blur-xl">
       <div className="flex items-center gap-2">
+        {showBack && (
+          <button
+            onClick={() => backTarget && navigate(backTarget)}
+            className="mr-1 flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        )}
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <Zap className="h-4 w-4 text-primary-foreground" />
+          <Rocket className="h-4 w-4 text-primary-foreground" />
         </div>
         <div className="flex flex-col">
-          <span className="text-sm font-bold text-foreground">JPM</span>
+          <span className="text-sm font-bold text-foreground">BrainJEE</span>
           {role === "admin" && (
             <span className="text-[10px] font-medium text-warning">Principal</span>
           )}

@@ -19,7 +19,101 @@ import {
   BookOpen,
   FolderOpen,
   Clock,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function AdminDashboardLoading() {
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      {/* Stats Grid Skeleton */}
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <Skeleton className="h-6 w-12" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        ))}
+      </div>
+
+      {/* Department Performance Skeleton */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-4 rounded-sm" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <Skeleton className="h-2.5 w-full rounded-full" />
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Actions Skeleton */}
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
+              <Skeleton className="h-6 w-6 rounded-md" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Global Exam Skeleton */}
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-48" />
+        <div className="rounded-2xl border border-border bg-card p-5">
+           <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <div className="flex flex-col gap-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+              </div>
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+           </div>
+        </div>
+      </div>
+
+      {/* Recent Activity Skeleton */}
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <div className="flex flex-1 flex-col gap-2">
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-2 w-1/4" />
+              </div>
+              <Skeleton className="h-4 w-4 rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type ActivityAppearance = {
   container: string;
@@ -51,6 +145,18 @@ export function AdminDashboardScreen() {
   const [loading, setLoading] = useState(!adminDashboardData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Dialog state for feedback
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<{
+    title: string;
+    description: string;
+    type: "success" | "error";
+  }>({
+    title: "",
+    description: "",
+    type: "success",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -123,13 +229,9 @@ export function AdminDashboardScreen() {
         </span>
       </div>
 
-      {loading && (
-        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Loading dashboard...
-        </div>
-      )}
-
-      {!loading && error && (
+      {loading ? (
+        <AdminDashboardLoading />
+      ) : error ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{error}</p>
           <div className="flex gap-2">
@@ -147,9 +249,7 @@ export function AdminDashboardScreen() {
             </button>
           </div>
         </div>
-      )}
-
-      {!loading && !error && dashboard && (
+      ) : dashboard ? (
         <>
           {/* Stats Grid */}
           <div className="animate-fade-in grid grid-cols-2 gap-3" style={{ animationDelay: "100ms" }}>
@@ -278,11 +378,21 @@ export function AdminDashboardScreen() {
                       const input = document.getElementById("jee-date-input") as HTMLInputElement;
                       if (!input || !input.value || !authToken) return;
                       try {
-                        const res = await setGlobalJeeDate(authToken, `${input.value}T00:00:00Z`);
-                        alert(res.message);
+                        const res = await (setGlobalJeeDate(authToken, `${input.value}T00:00:00Z`) as Promise<{ message: string }>);
+                        setDialogConfig({
+                          title: "Update Successful",
+                          description: res.message,
+                          type: "success",
+                        });
+                        setDialogOpen(true);
                         setReloadKey(prev => prev + 1);
                       } catch (err) {
-                        alert("Failed to set exam date");
+                        setDialogConfig({
+                          title: "Update Failed",
+                          description: err instanceof ApiError ? err.detail : "Failed to set exam date",
+                          type: "error",
+                        });
+                        setDialogOpen(true);
                       }
                     }}
                     className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-transform active:scale-95"
@@ -334,7 +444,39 @@ export function AdminDashboardScreen() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
+      {/* Result Dialog */}
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent className="w-[90%] max-w-[360px] rounded-2xl">
+          <AlertDialogHeader className="flex flex-col items-center gap-1">
+            <div className={`mb-2 flex h-12 w-12 items-center justify-center rounded-full ${
+              dialogConfig.type === "success" ? "bg-accent/15" : "bg-destructive/15"
+            }`}>
+              {dialogConfig.type === "success" ? (
+                <CheckCircle2 className="h-6 w-6 text-accent" />
+              ) : (
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              )}
+            </div>
+            <AlertDialogTitle className="text-lg font-bold">
+              {dialogConfig.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-sm">
+              {dialogConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction 
+              onClick={() => setDialogOpen(false)}
+              className={`w-full rounded-xl py-2.5 text-sm font-semibold ${
+                dialogConfig.type === "success" ? "" : "bg-destructive hover:bg-destructive/90"
+              }`}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

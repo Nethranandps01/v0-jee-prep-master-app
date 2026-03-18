@@ -16,7 +16,29 @@ import {
   Trophy,
   Flame,
   BookOpen,
+  Check,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function NotificationsLoading() {
+  return (
+    <div className="flex flex-col gap-3 w-full animate-fade-in">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4">
+          <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-2 w-2 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-2 w-16 mt-1" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const iconMap: Record<string, typeof Bell> = {
   test: FileText,
@@ -170,47 +192,50 @@ export function NotificationsScreen() {
       )}
 
       <div className="flex flex-col gap-2">
-        {loading && (
+        {loading ? (
+          <NotificationsLoading />
+        ) : items.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            Loading notifications...
+             No notifications available.
           </div>
-        )}
-
-        {!loading && items.length === 0 && (
-          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            No notifications available.
-          </div>
-        )}
-
-        {!loading &&
+        ) : (
           items.map((notification, index) => {
             const Icon = iconMap[notification.type] || Bell;
             const colorClass = colorMap[notification.type] || "bg-muted text-muted-foreground";
             return (
-              <button
+              <div
                 key={notification.id}
-                onClick={() => {
-                  void handleMarkRead(notification);
-                }}
-                className={`animate-fade-in flex items-start gap-3 rounded-2xl border p-4 transition-colors ${
-                  notification.read ? "border-border bg-card" : "border-primary/20 bg-primary/5"
+                className={`animate-fade-in relative flex items-start gap-3 rounded-2xl border p-4 transition-colors ${
+                  notification.read ? "border-border bg-card" : "border-primary/20 bg-primary/5 shadow-sm"
                 }`}
                 style={{ animationDelay: `${index * 80}ms` }}
               >
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${colorClass}`}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <div className="flex flex-1 flex-col gap-1">
+                <div className="flex flex-1 flex-col gap-1 pr-8">
                   <div className="flex items-start justify-between">
-                    <span className="text-sm font-semibold text-foreground">{notification.title}</span>
-                    {!notification.read && <div className="mt-1.5 h-2 w-2 rounded-full bg-primary" />}
+                    <span className="text-sm font-semibold text-foreground text-left">{notification.title}</span>
                   </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{notification.message}</p>
-                  <span className="text-[10px] text-muted-foreground/70">{timeAgo(notification.created_at)}</span>
+                  <p className="text-xs leading-relaxed text-muted-foreground text-left line-clamp-2">{notification.message}</p>
+                  <span className="text-[10px] text-muted-foreground/70 text-left pt-0.5">{timeAgo(notification.created_at)}</span>
                 </div>
-              </button>
+                {!notification.read && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleMarkRead(notification);
+                    }}
+                    title="Mark as read"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-all hover:bg-primary hover:text-primary-foreground active:scale-95"
+                  >
+                    <Check className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             );
-          })}
+          })
+        )}
       </div>
     </div>
   );

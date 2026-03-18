@@ -5,6 +5,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 from pymongo.database import Database
 
+from app.core.cache import cache_get, cache_set
 from app.core.config import get_settings
 from app.schemas.student import FeedbackRequest, SaveAnswersRequest
 from app.services.activity_service import ActivityService
@@ -17,9 +18,283 @@ from app.utils.mongo import parse_object_id, serialize_id
 
 
 class StudentService:
+
+    @staticmethod
+    def dashboard_summary(db: Database, student: dict) -> dict:
+        """
+        Aggregated view for the student dashboard.
+        Returns small, already-shaped payloads used on the home screen.
+        """
+        student_id = str(student["_id"])
+        cache_key = f"student:dashboard:{student_id}:v1"
+
+        if cached := cache_get(cache_key):
+            return cached
+
+        # Reuse existing optimized helpers (each of them is cached individually as well)
+        home = StudentService.home_summary(db, student)
+
+        # Progress has two variants; prefer the richer v1 result when available.
+        full_progress = StudentService.progress(db, student)
+
+        tests = StudentService.list_tests(db, student, status_filter=None, subject=None)
+        notifications = StudentService.list_notifications(db, student)
+
+        payload = {
+            "home": home,
+            "progress": full_progress,
+            "tests": tests,
+            "notifications": notifications,
+        }
+        cache_set(cache_key, payload, ttl=timedelta(minutes=3))
+        return payload
+
+    # 🚀 HOME SUMMARY (OPTIMIZED)
     @staticmethod
     def home_summary(db: Database, student: dict) -> dict:
         student_id = str(student["_id"])
+        cache_key = f"student:home:{student_id}:v2"
+
+        if cached := cache_get(cache_key):
+            return cached
+
+        year = student.get("year")
+
+        # 🔥 SINGLE aggregation instead of multiple queries
+        pipeline = [
+            {"$match": {"student_id": student_id, "status": "submitted"}},
+            {
+                "$group": {
+                    "_id": None,
+                    "completed_tests": {"$sum": 1},
+                    "avg_score": {"$avg": "$score"},
+                    "last_dates": {"$push": "$submitted_at"},
+                }
+            }
+        ]
+
+        stats = list(db.test_attempts.aggregate(pipeline))
+        completed_tests = stats[0]["completed_tests"] if stats else 0
+        avg_score = round(float(stats[0]["avg_score"]), 1) if stats else 0.0
+
+        # 🚀 Assigned tests (optimized)
+        assigned_tests_count = db.tests.count_documents({
+            "status": {"$in": ["assigned", "active"]},
+            "year": year
+        })
+
+        # 🚀 Streak optimized
+        streak = 0
+        if stats and stats[0].get("last_dates"):
+            dates = sorted(
+                {d.date() for d in stats[0]["last_dates"] if d},
+                reverse=True
+            )
+
+            if dates:
+                today = datetime.now(timezone.utc).date()
+                if (today - dates[0]).days <= 1:
+                    streak = 1
+                    for i in range(len(dates) - 1):
+                        if (dates[i] - dates[i+1]).days == 1:
+                            streak += 1
+                        else:
+                            break
+
+        result = {
+            "assigned_tests": assigned_tests_count,
+            "completed_tests": completed_tests,
+            "avg_score": avg_score,
+            "streak": streak,
+        }
+
+        # Cache for 3 minutes – fast enough to feel live, long enough to absorb bursts.
+        cache_set(cache_key, result, ttl=timedelta(minutes=3))
+        return result
+
+
+    # 🚀 LIST TESTS (MAJOR OPTIMIZATION)
+    @staticmethod
+    def list_tests(db: Database, student: dict, status_filter=None, subject=None):
+        student_id = str(student["_id"])
+        cache_key = f"student:tests:{student_id}:{status_filter}:{subject}:v2"
+
+        if cached := cache_get(cache_key):
+            return cached
+
+        query = {
+            "status": {"$in": ["assigned", "active"]},
+            "year": student.get("year")
+        }
+
+        if subject:
+            query["subject"] = subject
+
+        # 🔥 SINGLE pipeline (no multiple queries)
+        pipeline = [
+            {"$match": query},
+            {"$sort": {"created_at": -1}},
+            {
+                "$lookup": {
+                    "from": "test_attempts",
+                    "let": {"test_id": {"$toString": "$_id"}},
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$and": [
+                                        {"$eq": ["$test_id", "$$test_id"]},
+                                        {"$eq": ["$student_id", student_id]},
+                                        {"$eq": ["$status", "submitted"]}
+                                    ]
+                                }
+                            }
+                        },
+                        {"$project": {"score": 1}},
+                        {"$limit": 1}
+                    ],
+                    "as": "attempt"
+                }
+            },
+            {
+                "$project": {
+                    "title": 1,
+                    "subject": 1,
+                    "created_at": 1,
+                    "score": {"$arrayElemAt": ["$attempt.score", 0]}
+                }
+            }
+        ]
+
+        tests = list(db.tests.aggregate(pipeline))
+
+        responses = []
+        for t in tests:
+            payload = serialize_id(t)
+
+            payload["status"] = "completed" if payload.get("score") else "assigned"
+
+            if status_filter and payload["status"] != status_filter:
+                continue
+
+            responses.append(payload)
+
+        # Shorter cache for tests to reflect new assignments reasonably quickly.
+        cache_set(cache_key, responses, ttl=timedelta(minutes=2))
+        return responses
+
+
+    # 🚀 SAVE ANSWERS (MINOR OPTIMIZATION)
+    @staticmethod
+    def save_answers(db: Database, student: dict, attempt_id: str, payload):
+        student_id = str(student["_id"])
+        attempt_oid = parse_object_id(attempt_id, "attempt_id")
+
+        attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
+        if not attempt:
+            raise HTTPException(404, "Attempt not found")
+
+        if attempt["status"] != "in_progress":
+            raise HTTPException(409, "Already submitted")
+
+        # 🔥 Direct merge (faster)
+        db.test_attempts.update_one(
+            {"_id": attempt_oid},
+            {
+                "$set": {
+                    "answers": payload.answers,
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+
+        return {"attempt_id": attempt_id}
+
+
+    # 🚀 SUBMIT ATTEMPT (OPTIMIZED LOGIC)
+    @staticmethod
+    def submit_attempt(db: Database, student: dict, attempt_id: str):
+        student_id = str(student["_id"])
+        attempt_oid = parse_object_id(attempt_id, "attempt_id")
+
+        attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
+        if not attempt:
+            raise HTTPException(404, "Attempt not found")
+
+        if attempt["status"] == "submitted":
+            raise HTTPException(409, "Already submitted")
+
+        answers = attempt.get("answers", {})
+        question_set = attempt.get("question_set", [])
+
+        correct = 0
+        answered = 0
+
+        for q in question_set:
+            qid = str(q["id"])
+            if qid in answers:
+                answered += 1
+                if answers[qid] == q["correct"]:
+                    correct += 1
+
+        total = len(question_set)
+        score = round((correct / total) * 100, 1) if total else 0
+
+        db.test_attempts.update_one(
+            {"_id": attempt_oid},
+            {"$set": {
+                "status": "submitted",
+                "score": score,
+                "correct_answers": correct,
+                "incorrect_answers": answered - correct,
+                "unattempted": total - answered,
+                "submitted_at": datetime.now(timezone.utc),
+            }}
+        )
+
+        return {"score": score}
+
+
+    # 🚀 PROGRESS (OPTIMIZED)
+    @staticmethod
+    def progress(db: Database, student: dict):
+        student_id = str(student["_id"])
+        cache_key = f"student:progress:{student_id}:v2"
+
+        if cached := cache_get(cache_key):
+            return cached
+
+        pipeline = [
+            {"$match": {"student_id": student_id, "status": "submitted"}},
+            {
+                "$group": {
+                    "_id": "$subject",
+                    "avg": {"$avg": "$score"},
+                    "count": {"$sum": 1}
+                }
+            }
+        ]
+
+        results = list(db.test_attempts.aggregate(pipeline))
+
+        total = sum(r["count"] for r in results)
+        avg = round(sum(r["avg"] * r["count"] for r in results) / total, 1) if total else 0
+
+        response = {
+            "avg_score": avg,
+            "topic_mastery": results
+        }
+
+        cache_set(cache_key, response, ttl=timedelta(minutes=5))
+        return response
+    @staticmethod
+    def home_summary(db: Database, student: dict) -> dict:
+        student_id = str(student["_id"])
+        cache_key = f"student:home:{student_id}:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            return cached
+
         year = student.get("year")
         class_ids = StudentService._student_class_ids(db, student_id)
 
@@ -73,12 +348,14 @@ class StudentService:
                     if (unique_dates[i] - unique_dates[i+1]).days == 1: streak += 1
                     else: break
 
-        return {
+        result = {
             "assigned_tests": assigned_tests_count,
             "completed_tests": completed_tests,
             "avg_score": avg_score,
             "streak": streak,
         }
+        cache_set(cache_key, result, ttl=timedelta(minutes=2))
+        return result
 
     @staticmethod
     def list_tests(
@@ -88,12 +365,19 @@ class StudentService:
         subject: str | None,
     ) -> list[dict]:
         student_id = str(student["_id"])
+        cache_key = f"student:tests:{student_id}:{status_filter or 'all'}:{subject or 'all'}:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            return cached
+
         year = student.get("year")
         class_ids = StudentService._student_class_ids(db, student_id)
 
+        # Only pull what we need for the list UI (avoid big attempt payloads).
         submitted_attempts = list(
             db.test_attempts.find(
                 {"student_id": student_id, "status": "submitted"},
+                {"test_id": 1, "score": 1, "submitted_at": 1},
             ).sort("submitted_at", -1)
         )
         # Collect all tests to fetch
@@ -129,8 +413,12 @@ class StudentService:
         if subject:
             main_query["subject"] = subject
 
+        test_list_projection = {"question_set": 0}
+
         # Fetch assigned tests
-        assigned_tests = list(db.tests.find(main_query).sort("created_at", -1))
+        assigned_tests = list(
+            db.tests.find(main_query, test_list_projection).sort("created_at", -1)
+        )
         
         # Identify which submitted tests are missing from the assigned list
         assigned_ids = {str(t["_id"]) for t in assigned_tests}
@@ -142,7 +430,7 @@ class StudentService:
             missing_query = {"_id": {"$in": missing_ids}}
             if subject:
                 missing_query["subject"] = subject
-            additional_tests = list(db.tests.find(missing_query))
+            additional_tests = list(db.tests.find(missing_query, test_list_projection))
 
         # Combine and sort
         all_tests = assigned_tests + additional_tests
@@ -182,10 +470,11 @@ class StudentService:
 
             responses.append(payload)
 
+        cache_set(cache_key, responses, ttl=timedelta(minutes=2))
         return responses
 
     @staticmethod
-    def start_test(db: Database, student: dict, test_id: str) -> dict:
+    async def start_test(db: Database, student: dict, test_id: str) -> dict:
         student_id = str(student["_id"])
         test_oid = parse_object_id(test_id, "test_id")
 
@@ -218,7 +507,7 @@ class StudentService:
         question_set = test.get("question_set") or []
         if not question_set:
             try:
-                question_set = build_question_set(
+                question_set = await build_question_set(
                     str(test.get("subject", "Physics")),
                     total_questions,
                     str(test.get("difficulty", "Medium")),
@@ -540,6 +829,10 @@ class StudentService:
     @staticmethod
     def progress(db: Database, student: dict) -> dict:
         student_id = str(student["_id"])
+        cache_key = f"student:progress:{student_id}:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            return cached
 
         # 1. Subject Breakdown & Mastery (Aggregation)
         mastery_results = list(db.test_attempts.aggregate([
@@ -600,7 +893,7 @@ class StudentService:
 
         if not rank_history: rank_history = [{"week": "Now", "rank": 0}]
 
-        return {
+        result = {
             "overall_rank": curr_rank,
             "total_students": total_students,
             "tests_completed": total_completed,
@@ -608,6 +901,8 @@ class StudentService:
             "rank_history": rank_history,
             "topic_mastery": topic_mastery,
         }
+        cache_set(cache_key, result, ttl=timedelta(minutes=3))
+        return result
     @staticmethod
     def list_library(db: Database, student: dict, subject: str | None = None) -> list[dict]:
         year = student.get("year")
@@ -970,6 +1265,19 @@ class StudentService:
 
     @staticmethod
     def save_chat_message(db: Database, session_id: str, role: str, content: str) -> str:
+        if role == "user":
+            session = db.chat_sessions.find_one({"_id": parse_object_id(session_id, "session_id")})
+            if session and (session.get("title") == "New Chat"):
+                existing = db.chat_messages.count_documents({"session_id": session_id})
+                if existing == 0:
+                    suggested = " ".join(str(content).split()).strip()
+                    if suggested:
+                        title = suggested[:30] + ("..." if len(suggested) > 30 else "")
+                        db.chat_sessions.update_one(
+                            {"_id": parse_object_id(session_id, "session_id")},
+                            {"$set": {"title": title}},
+                        )
+
         doc = {
             "session_id": session_id,
             "role": role,

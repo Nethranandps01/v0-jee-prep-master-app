@@ -1,12 +1,12 @@
 "use client";
 
-const DEFAULT_API_BASE_URL = "http://192.168.0.154:8000/api/v1";
+// const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
 const PRODUCTION_API_URL = "https://jpm-backend.onrender.com/api/v1";
 
 export const API_BASE_URL = (
   (typeof window !== "undefined" ? (window as any)._env_?.NEXT_PUBLIC_API_BASE_URL : null) ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  PRODUCTION_API_URL
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? PRODUCTION_API_URL
+  // DEFAULT_API_BASE_URL 
 ).replace(/\/+$/, "");
 
 export type ApiRole = "admin" | "teacher" | "student";
@@ -972,6 +972,18 @@ export async function submitStudentFeedback(
 
 export async function listNotifications(token: string): Promise<NotificationResponse[]> {
   return apiRequest<NotificationResponse[]>("/notifications", { token });
+}
+
+// Student dashboard (batched)
+export interface StudentDashboardResponse {
+  home: StudentHomeSummaryResponse;
+  progress: StudentProgressResponse;
+  tests: StudentTestResponse[];
+  notifications: NotificationResponse[];
+}
+
+export async function getStudentDashboard(token: string): Promise<StudentDashboardResponse> {
+  return apiRequest<StudentDashboardResponse>("/student/dashboard", { token });
 }
 
 export async function markNotificationRead(

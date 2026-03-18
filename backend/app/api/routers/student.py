@@ -5,7 +5,14 @@ from fastapi.responses import StreamingResponse
 from pymongo.database import Database
 
 from app.api.deps import get_current_user, get_db, require_roles
-from app.schemas.common import MessageResponse, ChatAskResponse, ChatRequest, ChatSession, ChatMessage
+from app.schemas.common import (
+    MessageResponse,
+    ChatAskResponse,
+    ChatRequest,
+    ChatSession,
+    ChatMessage,
+    CreateChatSessionRequest,
+)
 from app.schemas.student import (
     FeedbackRequest,
     ResultResponse,
@@ -33,6 +40,19 @@ router = APIRouter(
     tags=["student"],
     dependencies=[Depends(require_roles("student"))],
 )
+
+
+@router.get("/dashboard")
+async def student_dashboard(
+    db: Database = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Single optimized endpoint for the student home dashboard.
+    Bundles home summary, progress, tests, and notifications in one call.
+    """
+    data = StudentService.dashboard_summary(db, current_user)
+    return data
 
 
 @router.post("/chat/ask")
@@ -77,7 +97,7 @@ async def start_test(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> StartAttemptResponse:
-    return StartAttemptResponse(**StudentService.start_test(db, current_user, test_id))
+    return StartAttemptResponse(**await StudentService.start_test(db, current_user, test_id))
 
 
 @router.post("/attempts/{attempt_id}/answers")
@@ -181,11 +201,11 @@ async def submit_feedback(
 
 @router.post("/chat/sessions", response_model=ChatSession)
 async def create_chat_session(
-    title: str | None = None,
+    payload: CreateChatSessionRequest,
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> ChatSession:
-    return ChatSession(**StudentService.create_chat_session(db, current_user, title))
+    return ChatSession(**StudentService.create_chat_session(db, current_user, payload.title))
 
 
 @router.get("/chat/sessions", response_model=list[ChatSession])
@@ -313,7 +333,7 @@ async def generate_task_quiz(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     from app.services.planner_service import PlannerService
-    return PlannerService.generate_task_quiz(db, current_user["_id"], task_id)
+    return await PlannerService.generate_task_quiz(db, current_user["_id"], task_id)
 
 
 @router.post("/planner/tasks/{task_id}/subtopics/toggle", response_model=dict)

@@ -10,6 +10,32 @@ import {
   CheckCircle2,
   Filter,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function StudentTestsLoading() {
+  return (
+    <div className="flex flex-col gap-3 w-full animate-fade-in">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-1/4" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-2.5 w-10" />
+              <Skeleton className="h-2.5 w-12" />
+              <Skeleton className="h-3.5 w-14 rounded-full" />
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Skeleton className="h-6 w-12" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const statusFilters = ["All", "Assigned", "Completed"] as const;
 const subjects = ["All", "Physics", "Chemistry", "Mathematics"] as const;
@@ -93,7 +119,7 @@ export function StudentTestsScreen() {
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-bold text-foreground">My Tests</h1>
         <p className="text-sm text-muted-foreground">
-          {year} Class - {loading ? "Loading..." : `${tests.length} tests`}
+          {year} Class - {loading ? "Fetching..." : `${tests.length} tests`}
         </p>
       </div>
 
@@ -143,19 +169,14 @@ export function StudentTestsScreen() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {loading && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">Loading tests...</p>
-          </div>
-        )}
-
-        {!loading && tests.length === 0 && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center">
+        {loading ? (
+          <StudentTestsLoading />
+        ) : tests.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card p-8 text-center flex flex-col items-center gap-2">
+            <BookOpen className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">No tests found</p>
           </div>
-        )}
-
-        {!loading &&
+        ) : (
           tests.map((test, index) => (
             <button
               key={test.id}
@@ -174,9 +195,7 @@ export function StudentTestsScreen() {
               style={{ animationDelay: `${index * 80}ms` }}
             >
               <div
-                className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                  test.status === "completed" ? "bg-accent/15" : "bg-primary/10"
-                }`}
+                className={`flex h-12 w-12 items-center justify-center rounded-xl bg-muted/40`}
               >
                 {test.status === "completed" ? (
                   <CheckCircle2 className="h-6 w-6 text-accent" />
@@ -214,8 +233,10 @@ export function StudentTestsScreen() {
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </button>
-          ))}
+          ))
+        )}
       </div>
     </div>
+    
   );
 }

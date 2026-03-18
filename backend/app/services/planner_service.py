@@ -205,7 +205,7 @@ class PlannerService:
         return result.modified_count > 0
 
     @staticmethod
-    def generate_task_quiz(db: Database, student_id: str, task_id: str) -> dict[str, Any]:
+    async def generate_task_quiz(db: Database, student_id: str, task_id: str) -> dict[str, Any]:
         """
         Generates a 5-question quiz for a specific study task.
         """
@@ -224,7 +224,7 @@ class PlannerService:
         topic = task.get("title", "General") + " - " + task.get("topic", "")
         
         # Generate 5 questions (try AI, fallback to template)
-        questions, source = build_question_set_with_source(
+        questions, source = await build_question_set_with_source(
             subject=subject,
             total_questions=5,
             difficulty="Medium",
@@ -381,15 +381,55 @@ class PlannerService:
     def bulk_generate_plans(db: Database, jee_date: datetime) -> int:
         """
         Generates/Updates plans for all active students using the provided JEE date.
+        Optimized to use template caching to minimize AI calls (optimized for <300ms route response).
         """
         students = list(db.users.find({"role": "student", "status": "active"}))
+        if not students:
+            return 0
+            
+        # Optimization: Reuse generated plans for students with same year/availability
+        # This reduces N AI calls to roughly 2-6 calls total.
+        templates: dict[tuple[str, float], list[dict]] = {}
+        
         count = 0
         for student in students:
             student_id = str(student["_id"])
-            availability = student.get("availability_hours", 4.0) # Default 4 hours
-            # Reset/Generate plan
-            PlannerService.generate_plan(db, student_id, availability, jee_date)
+            year = str(student.get("year") or "12th")
+            availability = float(student.get("availability_hours") or 4.0)
+            # Round availability to avoid slight variations causing cache misses
+            rounded_avail = round(availability, 1)
+            
+            cache_key = (year, rounded_avail)
+            
+            if cache_key not in templates:
+                # First time seeing this combination: generate via AI
+                # This will update the first student and populate our template
+                plan_res = PlannerService.generate_plan(db, student_id, availability, jee_date)
+                templates[cache_key] = plan_res.get("tasks", [])
+            else:
+                # Reuse template: clone tasks and update for this student
+                import uuid
+                tasks_copy = []
+                for t in templates[cache_key]:
+                    new_t = dict(t)
+                    new_t["id"] = str(uuid.uuid4())
+                    new_t["status"] = "pending" # Reset status for new date
+                    tasks_copy.append(new_t)
+                
+                db.study_plans.update_one(
+                    {"student_id": student_id},
+                    {
+                        "$set": {
+                            "availability_hours": availability,
+                            "target_exam_date": jee_date,
+                            "tasks": tasks_copy,
+                            "updated_at": datetime.now(timezone.utc)
+                        }
+                    },
+                    upsert=True
+                )
             count += 1
+            
         return count
 
     @staticmethod

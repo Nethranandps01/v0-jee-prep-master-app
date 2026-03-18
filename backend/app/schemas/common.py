@@ -31,6 +31,10 @@ class ChatAskResponse(BaseModel):
     response: str
 
 
+class CreateChatSessionRequest(BaseModel):
+    title: str | None = None
+
+
 class ChatSession(BaseModel):
     id: str
     title: str

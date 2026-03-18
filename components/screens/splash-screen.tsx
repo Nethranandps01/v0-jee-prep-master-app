@@ -2,7 +2,9 @@
 
 import { useEffect } from "react";
 import { useApp } from "@/lib/app-context";
-import { Zap } from "lucide-react";
+import { Rocket } from "lucide-react";
+
+import { theme } from "@/lib/theme";
 
 export function SplashScreen() {
   const { navigate } = useApp();
@@ -15,29 +17,30 @@ export function SplashScreen() {
   }, [navigate]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background transition-colors duration-500">
       <div className="animate-scale-in flex flex-col items-center gap-6">
-        <div className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-primary animate-pulse-glow">
-          <Zap className="h-12 w-12 text-primary-foreground" />
-          <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-accent" />
+        <div className="relative flex h-24 w-24 items-center justify-center rounded-[32px] bg-primary shadow-[0_0_50px_-12px] shadow-primary/50 animate-pulse-glow">
+          <Rocket className="h-12 w-12 text-primary-foreground" />
         </div>
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            JPM
+        <div className="flex flex-col items-center gap-2 animate-fade-in">
+          <h1 className="text-4xl font-bold tracking-tighter text-foreground">
+            BrainJEE
           </h1>
-          <p className="text-sm font-medium text-muted-foreground">
+          <p className="text-sm font-semibold text-muted-foreground/80 tracking-wide uppercase">
             AI-Powered JEE Mastery
           </p>
         </div>
-        <div className="mt-8 flex items-center gap-2">
-          <div className="h-2 w-2 animate-bounce rounded-full bg-primary" style={{ animationDelay: "0ms" }} />
-          <div className="h-2 w-2 animate-bounce rounded-full bg-primary" style={{ animationDelay: "150ms" }} />
-          <div className="h-2 w-2 animate-bounce rounded-full bg-primary" style={{ animationDelay: "300ms" }} />
+        <div className="mt-12 flex items-center gap-3">
+          <div className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary" style={{ animationDelay: "0ms" }} />
+          <div className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary" style={{ animationDelay: "200ms" }} />
+          <div className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary" style={{ animationDelay: "400ms" }} />
         </div>
       </div>
-      <p className="absolute bottom-8 text-xs text-muted-foreground">
-        Preparing your learning experience...
-      </p>
+      <div className="absolute bottom-12 flex flex-col items-center gap-2">
+         <p className="text-xs font-medium text-muted-foreground/60">
+           Preparing your learning experience...
+         </p>
+      </div>
     </div>
   );
 }

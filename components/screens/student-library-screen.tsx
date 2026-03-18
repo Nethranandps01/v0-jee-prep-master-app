@@ -202,11 +202,11 @@ export function StudentLibraryScreen() {
             return (
               <div
                 key={item.id}
-                className="animate-fade-in flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
+                className="animate-fade-in flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4"
                 style={{ animationDelay: `${index * 80}ms` }}
               >
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl ${item.subject === "Physics"
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${item.subject === "Physics"
                       ? "bg-primary/10"
                       : item.subject === "Chemistry"
                         ? "bg-accent/10"
@@ -228,9 +228,9 @@ export function StudentLibraryScreen() {
                     <BookOpen className="h-6 w-6 text-primary" />
                   )}
                 </div>
-                <div className="flex flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-sm font-semibold text-foreground">{item.title}</span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <span className="text-xs text-muted-foreground">{item.subject}</span>
                     <span className="text-xs text-muted-foreground">{item.chapters} chapters</span>
                     <span className="text-xs text-muted-foreground">{item.type}</span>
@@ -246,14 +246,13 @@ export function StudentLibraryScreen() {
                     void handleDownload(item);
                   }}
                   disabled={downloadingId === item.id}
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${isDownloaded ? "bg-accent/15" : "bg-primary/10 hover:bg-primary/20"
-                    }`}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                   aria-label={isDownloaded ? "Downloaded" : "Download"}
                 >
                   {downloadingId === item.id ? (
                     <span className="text-[10px] text-primary">...</span>
                   ) : isDownloaded ? (
-                    <CheckCircle2 className="h-5 w-5 text-accent" />
+                    <Download className="h-5 w-5 text-primary" />
                   ) : (
                     <Download className="h-5 w-5 text-primary" />
                   )}

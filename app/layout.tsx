@@ -1,7 +1,10 @@
 import React from "react"
 import type { Metadata, Viewport } from "next";
-import { ThemeProvider } from "@/components/theme-provider";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { AppProviders } from "@/components/app-providers";
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "JEE Prep Master - AI-Powered JEE Mastery",
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#3B82F6",
+  themeColor: "#1F6F78",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -26,15 +29,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+      <body className={`${inter.className} font-sans antialiased`}>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

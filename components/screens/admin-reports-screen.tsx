@@ -21,6 +21,40 @@ import {
   GraduationCap,
   ChevronRight,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function AdminReportsLoading() {
+  return (
+    <div className="flex flex-col gap-6 w-full animate-fade-in">
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <Skeleton className="h-6 w-12" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="flex flex-col gap-4 mt-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              <Skeleton className="h-3 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AdminReportsScreen() {
   const { authToken } = useApp();
@@ -131,7 +165,7 @@ export function AdminReportsScreen() {
       <div className="animate-fade-in flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-bold text-foreground">Reports</h1>
-          <p className="text-xs text-muted-foreground">Institution analytics & billing</p>
+          <p className="text-xs text-muted-foreground">{loading ? 'Fetching...' : 'Institution analytics & billing'}</p>
         </div>
         <button
           onClick={handleExport}
@@ -176,9 +210,7 @@ export function AdminReportsScreen() {
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Loading reports...
-        </div>
+        <AdminReportsLoading />
       ) : error ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{error}</p>
@@ -235,7 +267,7 @@ export function AdminReportsScreen() {
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         dept.avg_score >= 80
-                          ? "bg-accent"
+                          ? "bg-emerald-500"
                           : dept.avg_score >= 70
                           ? "bg-primary"
                           : "bg-warning"

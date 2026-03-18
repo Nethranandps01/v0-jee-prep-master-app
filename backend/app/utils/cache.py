@@ -22,7 +22,8 @@ class SimpleTTLCache:
         self.cache.clear()
 
 # Global instances for different domains
-student_cache = SimpleTTLCache(ttl_seconds=30)
-teacher_cache = SimpleTTLCache(ttl_seconds=30)
-admin_cache = SimpleTTLCache(ttl_seconds=60)
+# Student/teacher dashboard data can be safely cached for a couple of minutes.
+student_cache = SimpleTTLCache(ttl_seconds=120)
+teacher_cache = SimpleTTLCache(ttl_seconds=120)
+admin_cache = SimpleTTLCache(ttl_seconds=180)
 planner_cache = SimpleTTLCache(ttl_seconds=300) # Planner assessment is heavy, cache longer

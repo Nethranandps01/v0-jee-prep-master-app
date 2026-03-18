@@ -22,6 +22,40 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function TeacherClassesLoading() {
+  return (
+    <div className="flex flex-col gap-4 w-full animate-fade-in">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-12 w-12 rounded-xl" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+            <Skeleton className="h-5 w-5 rounded-md" />
+          </div>
+          <div className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
+             <Skeleton className="h-4 w-4 rounded-full" />
+             <div className="flex flex-1 flex-col gap-2">
+               <div className="flex justify-between">
+                 <Skeleton className="h-2.5 w-20" />
+                 <Skeleton className="h-2.5 w-8" />
+               </div>
+               <Skeleton className="h-1.5 w-full rounded-full" />
+             </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 flex-1 rounded-lg" />
+            <Skeleton className="h-8 flex-1 rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type ClassFormState = {
   name: string;
@@ -228,7 +262,7 @@ export function TeacherClassesScreen() {
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-bold text-foreground">My Classes</h1>
           <p className="text-sm text-muted-foreground">
-            {loading ? "Loading..." : `${classes.length} active classes`}
+            {loading ? "Fetching..." : `${classes.length} active classes`}
           </p>
         </div>
         <Button
@@ -247,100 +281,100 @@ export function TeacherClassesScreen() {
         </div>
       )}
 
-      <div className="flex gap-3">
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
-          <Users className="h-5 w-5 text-primary" />
-          <span className="text-lg font-bold text-foreground">{summary.totalStudents}</span>
-          <span className="text-[10px] text-muted-foreground">Total Students</span>
+      {loading ? (
+        <TeacherClassesLoading />
+      ) : error ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{error}</p>
+          <button
+            onClick={() => setReloadKey((value) => value + 1)}
+            className="w-fit rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+          >
+            Retry
+          </button>
         </div>
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
-          <TrendingUp className="h-5 w-5 text-accent" />
-          <span className="text-lg font-bold text-foreground">{summary.avg}%</span>
-          <span className="text-[10px] text-muted-foreground">Overall Avg</span>
+      ) : classes.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+          No classes created yet.
         </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Loading classes...
-          </div>
-        ) : error ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
-            <p className="text-sm text-destructive">{error}</p>
-            <button
-              onClick={() => setReloadKey((value) => value + 1)}
-              className="w-fit rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
-            >
-              Retry
-            </button>
-          </div>
-        ) : classes.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            No classes created yet.
-          </div>
-        ) : (
-          classes.map((cls, index) => (
-            <div
-              key={cls.id}
-              className="animate-fade-in flex flex-col gap-4 rounded-2xl border border-border bg-card p-4"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <div className="flex flex-1 flex-col gap-1">
-                  <span className="text-sm font-semibold text-foreground">{cls.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {cls.subject} | {cls.year} | {cls.students} students
-                  </span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-
-              <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                <div className="flex flex-1 flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Average Score</span>
-                    <span className="text-xs font-semibold text-foreground">{cls.avg_score}%</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full ${cls.avg_score >= 75
-                        ? "bg-accent"
-                        : cls.avg_score >= 65
-                          ? "bg-primary"
-                          : "bg-warning"
-                        }`}
-                      style={{ width: `${cls.avg_score}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 rounded-lg bg-transparent text-xs text-foreground"
-                  onClick={() => openStudentsModal(cls)}
-                >
-                  Manage Students
-                </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 rounded-lg bg-primary text-xs text-primary-foreground"
-                  onClick={() => navigate("teacher-tests")}
-                >
-                  Assign Test
-                </Button>
-              </div>
+      ) : (
+        <>
+          <div className="flex gap-3">
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
+              <Users className="h-5 w-5 text-primary" />
+              <span className="text-lg font-bold text-foreground">{summary.totalStudents}</span>
+              <span className="text-[10px] text-muted-foreground">Total Students</span>
             </div>
-          ))
-        )}
-      </div>
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
+              <TrendingUp className="h-5 w-5 text-accent" />
+              <span className="text-lg font-bold text-foreground">{summary.avg}%</span>
+              <span className="text-[10px] text-muted-foreground">Overall Avg</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {classes.map((cls, index) => (
+              <div
+                key={cls.id}
+                className="animate-fade-in flex flex-col gap-4 rounded-2xl border border-border bg-card p-4"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1">
+                    <span className="text-sm font-semibold text-foreground">{cls.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {cls.subject} | {cls.year} | {cls.students} students
+                    </span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+
+                <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-1 flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Average Score</span>
+                      <span className="text-xs font-semibold text-foreground">{cls.avg_score}%</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full ${cls.avg_score >= 75
+                          ? "bg-accent"
+                          : cls.avg_score >= 65
+                            ? "bg-primary"
+                            : "bg-warning"
+                          }`}
+                        style={{ width: `${cls.avg_score}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-lg bg-transparent text-xs text-foreground"
+                    onClick={() => openStudentsModal(cls)}
+                  >
+                    Manage Students
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 rounded-lg bg-primary text-xs text-primary-foreground"
+                    onClick={() => navigate("teacher-tests")}
+                  >
+                    Assign Test
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {showCreateForm && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm">
@@ -411,45 +445,91 @@ export function TeacherClassesScreen() {
               {selectedClass.year} | Select students for this class
             </p>
 
-            <div className="max-h-72 overflow-y-auto">
+            <div className="max-h-[60vh] overflow-y-auto pr-1">
               {studentsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading students...</p>
-              ) : studentsError ? (
-                <p className="text-sm text-destructive">{studentsError}</p>
-              ) : assignableStudents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No active students available for {selectedClass.year} yet.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {assignableStudents.map((student) => (
-                    <div
-                      key={student.id}
-                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 transition-colors ${selectedStudentIds.includes(student.id)
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-background"
-                        }`}
-                    >
-                      <button
-                        onClick={() => toggleStudentSelection(student.id)}
-                        className="flex flex-1 flex-col items-start gap-0.5 text-left"
-                      >
-                        <p className="text-sm font-medium text-foreground">{student.name}</p>
-                        <p className="text-xs text-muted-foreground">{student.email}</p>
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-muted"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStudentClick(student.id);
-                        }}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                <div className="flex flex-col gap-3 py-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-2xl" />
                   ))}
+                </div>
+              ) : studentsError ? (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-center">
+                  <p className="text-sm text-destructive font-medium">{studentsError}</p>
+                </div>
+              ) : assignableStudents.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                  <Users className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No students currently available for {selectedClass.year}.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {/* Members Section */}
+                  {selectedStudentIds.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="text-xs font-bold text-foreground">Current Members ({selectedStudentIds.length})</h3>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {assignableStudents
+                          .filter((student) => selectedStudentIds.includes(student.id))
+                          .map((student) => (
+                            <div
+                              key={student.id}
+                              className="group flex w-full items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 transition-all"
+                            >
+                              <div className="flex flex-1 flex-col items-start text-left cursor-default">
+                                <p className="text-sm font-bold text-foreground">{student.name}</p>
+                                <p className="text-[11px] text-muted-foreground">{student.email}</p>
+                              </div>
+                              <button
+                                onClick={() => toggleStudentSelection(student.id)}
+                                className="ml-2 rounded-xl bg-destructive/10 px-3 py-1.5 text-[11px] font-bold text-destructive hover:bg-destructive hover:text-white transition-colors"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add New Students Section (The ones that disappear after assigning) */}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-xs font-bold text-foreground">
+                        {selectedStudentIds.length > 0 ? "Add More Students" : "All Available Students"}
+                      </h3>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {assignableStudents
+                        .filter((student) => !selectedStudentIds.includes(student.id))
+                        .length === 0 ? (
+                          <p className="py-4 text-center text-xs text-muted-foreground">All available students are assigned.</p>
+                        ) : (
+                          assignableStudents
+                            .filter((student) => !selectedStudentIds.includes(student.id))
+                            .map((student) => (
+                              <div
+                                key={student.id}
+                                className="group flex w-full items-center justify-between rounded-2xl border border-border bg-background px-4 py-3 transition-all hover:border-primary/30"
+                              >
+                                <div className="flex flex-1 flex-col items-start text-left">
+                                  <p className="text-sm font-semibold text-foreground">{student.name}</p>
+                                  <p className="text-[11px] text-muted-foreground">{student.email}</p>
+                                </div>
+                                <button
+                                  onClick={() => toggleStudentSelection(student.id)}
+                                  className="ml-2 rounded-xl bg-primary/10 px-4 py-1.5 text-[11px] font-bold text-primary hover:bg-primary hover:text-white transition-colors"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            ))
+                        )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

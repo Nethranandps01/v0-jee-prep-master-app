@@ -4,17 +4,18 @@ import { useState } from "react";
 import { useApp } from "@/lib/app-context";
 import { Button } from "@/components/ui/button";
 import {
-  Zap,
   BookOpen,
+  Sparkles,
   BarChart3,
   GraduationCap,
   ChevronRight,
   ArrowRight,
+  Rocket,
 } from "lucide-react";
 
 const slides = [
   {
-    icon: Zap,
+    icon: Sparkles,
     title: "Ace JEE with AI",
     description:
       "Leverage cutting-edge AI to create personalized study plans, generate smart practice papers, and get instant doubt resolution.",
@@ -32,7 +33,7 @@ const slides = [
     title: "Track Your Progress",
     description:
       "Real-time rank tracking, topic-wise mastery rings, and improvement suggestions to keep you ahead of the competition.",
-    color: "bg-warning",
+    color: "bg-secondary",
   },
   {
     icon: GraduationCap,
@@ -63,17 +64,17 @@ export function OnboardingScreen() {
   const Icon = slide.icon;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background text-foreground transition-colors duration-500">
       <div className="flex items-center justify-between px-6 pt-12">
         <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold text-foreground">JPM</span>
+          <Rocket className="h-6 w-6 text-primary" />
+          <span className="text-base font-bold tracking-tight">JEE Prep Master</span>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleSkip}
-          className="text-muted-foreground"
+          className="text-muted-foreground hover:bg-muted/50 font-medium"
         >
           Skip
         </Button>
@@ -82,34 +83,34 @@ export function OnboardingScreen() {
       <div className="flex flex-1 flex-col items-center justify-center px-8">
         <div
           key={currentSlide}
-          className="animate-fade-in flex flex-col items-center gap-8 text-center"
+          className="animate-fade-in flex flex-col items-center gap-10 text-center"
         >
           <div
-            className={`flex h-28 w-28 items-center justify-center rounded-[2rem] ${slide.color}`}
+            className={`flex h-32 w-32 items-center justify-center rounded-[2.5rem] shadow-xl ${slide.color} ring-4 ring-background shadow-primary/20 transition-all duration-500`}
           >
-            <Icon className="h-14 w-14 text-primary-foreground" />
+            <Icon className="h-16 w-16 text-primary-foreground" />
           </div>
-          <div className="flex flex-col gap-3">
-            <h2 className="text-2xl font-bold text-foreground text-balance">
+          <div className="flex flex-col gap-4 max-w-sm">
+            <h2 className="text-3xl font-bold tracking-tight text-balance">
               {slide.title}
             </h2>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
+            <p className="text-sm leading-relaxed text-muted-foreground font-medium">
               {slide.description}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-6 px-8 pb-12">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col items-center gap-8 px-8 pb-14">
+        <div className="flex items-center gap-3">
           {slides.map((_, idx) => (
             <button
               key={idx}
               onClick={() => setCurrentSlide(idx)}
-              className={`h-2 rounded-full transition-all duration-300 ${
+              className={`h-2.5 rounded-full transition-all duration-500 ${
                 idx === currentSlide
-                  ? "w-8 bg-primary"
-                  : "w-2 bg-muted-foreground/30"
+                  ? "w-10 bg-primary"
+                  : "w-2.5 bg-muted"
               }`}
               aria-label={`Go to slide ${idx + 1}`}
             />
@@ -117,18 +118,18 @@ export function OnboardingScreen() {
         </div>
         <Button
           onClick={handleNext}
-          className="w-full max-w-sm gap-2 rounded-2xl bg-primary py-6 text-base font-semibold text-primary-foreground"
+          className="w-full max-w-sm h-14 rounded-2xl text-base font-bold shadow-lg transition-all active:scale-95"
           size="lg"
         >
           {currentSlide === slides.length - 1 ? (
             <>
               Get Started
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="ml-2 h-5 w-5" />
             </>
           ) : (
             <>
               Next
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="ml-1 h-5 w-5" />
             </>
           )}
         </Button>

@@ -1,12 +1,13 @@
 import mimetypes
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from bson import Binary
 from fastapi import HTTPException, status
 from pymongo.database import Database
 
+from app.core.cache import cache_get, cache_set
 from app.core.config import get_settings
 from app.schemas.teacher import (
     AssignPaperRequest,
@@ -31,6 +32,11 @@ class TeacherService:
     def get_home_summary(db: Database, teacher: dict) -> dict:
         teacher_id = str(teacher["_id"])
         subject = teacher.get("subject")
+
+        cache_key = f"teacher:home:{teacher_id}:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            return cached
 
         # 1. Total Unique Students across all classes (Aggregation)
         pipeline = [
@@ -62,32 +68,40 @@ class TeacherService:
         avg_result = list(db.test_attempts.aggregate(avg_pipeline))
         subject_avg = round(float(avg_result[0]["avg"]), 1) if avg_result else 0.0
 
-        return {
+        result = {
             "total_students": total_students,
             "total_papers": total_papers,
             "subject_avg": subject_avg,
         }
+        cache_set(cache_key, result, ttl=timedelta(seconds=30))
+        return result
 
     @staticmethod
     def list_papers(db: Database, teacher: dict) -> list[dict]:
         teacher_id = str(teacher["_id"])
-        docs = db.tests.find({"creator_id": teacher_id}).sort("created_at", -1)
+        # Paper list views never need full question_set payload (large).
+        docs = db.tests.find({"creator_id": teacher_id}, {"question_set": 0}).sort(
+            "created_at", -1
+        )
         return [TeacherService._paper_payload(doc, include_question_set=False) for doc in docs]
 
     @staticmethod
-    def create_paper(db: Database, teacher: dict, payload: TeacherPaperCreateRequest) -> dict:
+    async def create_paper(db: Database, teacher: dict, payload: TeacherPaperCreateRequest) -> dict:
         now = datetime.now(timezone.utc)
-        question_set, question_source = build_question_set_with_source(
+        question_set, question_source = await build_question_set_with_source(
             payload.subject,
             payload.questions,
             payload.difficulty,
             topic=payload.topic,
         )
         if TeacherService._should_require_ai_generation() and question_source != "ai":
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="AI question generation failed. Please retry.",
-            )
+            # If AI failed to provide ANY questions, we fallback to templates ONLY IF allowed, else error.
+            # But with parallel batching, success is much more likely.
+            if not question_set:
+                 raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="AI question generation failed. Please try a smaller batch or retry.",
+                )
 
         doc = {
             "title": payload.title,
@@ -131,7 +145,7 @@ class TeacherService:
         return TeacherService._paper_payload(paper, include_question_set=True)
 
     @staticmethod
-    def update_paper(
+    async def update_paper(
         db: Database,
         teacher: dict,
         paper_id: str,
@@ -150,16 +164,17 @@ class TeacherService:
             question_count = int(updates.get("questions", existing.get("questions", 0) or 0))
             difficulty = str(updates.get("difficulty", existing.get("difficulty", "Medium")))
             subject = str(existing.get("subject", "Physics"))
-            question_set, question_source = build_question_set_with_source(
+            question_set, question_source = await build_question_set_with_source(
                 subject,
                 question_count,
                 difficulty,
             )
             if TeacherService._should_require_ai_generation() and question_source != "ai":
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="AI question generation failed. Please retry.",
-                )
+                if not question_set:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="AI question generation failed. Please retry.",
+                    )
             updates["question_set"] = question_set
             updates["question_source"] = question_source
 
@@ -313,7 +328,9 @@ class TeacherService:
         student_ids = [parse_object_id(sid, "student_id") for sid in cls.get("student_ids", [])]
         students = []
         if student_ids:
-            docs = db.users.find({"_id": {"$in": student_ids}, "role": "student"})
+            docs = db.users.find(
+                {"_id": {"$in": student_ids}, "role": "student"}, {"password_hash": 0}
+            )
             for user in docs:
                 payload = serialize_id(user)
                 payload.pop("password_hash", None)
@@ -333,7 +350,7 @@ class TeacherService:
             query["year"] = year
 
         assigned_ids = {str(student_id) for student_id in cls.get("student_ids", [])}
-        docs = db.users.find(query).sort("name", 1)
+        docs = db.users.find(query, {"password_hash": 0}).sort("name", 1)
 
         students: list[dict] = []
         for user in docs:

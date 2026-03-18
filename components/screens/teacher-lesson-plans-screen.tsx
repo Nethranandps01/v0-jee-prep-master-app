@@ -26,6 +26,30 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function TeacherLessonPlansLoading() {
+  return (
+    <div className="flex flex-col gap-3 w-full animate-fade-in">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="flex w-full items-center gap-4 p-4 text-left">
+            <Skeleton className="h-12 w-12 rounded-xl" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-3/4" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-3 w-10 rounded-full" />
+                <Skeleton className="h-2.5 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-4 w-12 rounded-full" />
+            <Skeleton className="h-4 w-4 rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function TeacherLessonPlansScreen() {
   const { teacherSubject, authToken } = useApp();
@@ -200,7 +224,7 @@ export function TeacherLessonPlansScreen() {
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-bold text-foreground">Lesson Plans</h1>
           <p className="text-sm text-muted-foreground">
-            {subject} - {loading ? "Loading..." : `${filteredPlans.length} plans`}
+            {subject} - {loading ? "Fetching..." : `${filteredPlans.length} plans`}
           </p>
         </div>
         <Button
@@ -324,9 +348,7 @@ export function TeacherLessonPlansScreen() {
 
       <div className="flex flex-col gap-3">
         {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Loading lesson plans...
-          </div>
+          <TeacherLessonPlansLoading />
         ) : error ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
             <p className="text-sm text-destructive">{error}</p>

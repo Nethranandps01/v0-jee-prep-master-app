@@ -25,6 +25,27 @@ import {
   ToggleRight,
   X,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function AdminUsersLoading() {
+  return (
+    <div className="flex flex-col gap-2 w-full animate-fade-in">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3 w-10 rounded-full" />
+            </div>
+            <Skeleton className="h-2.5 w-20" />
+          </div>
+          <Skeleton className="h-4 w-4 rounded-md" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type TabFilter = "all" | "student" | "teacher";
 type AddUserRole = "student" | "teacher";
@@ -232,7 +253,7 @@ export function AdminUsersScreen() {
           <h1 className="text-xl font-bold text-foreground">User Management</h1>
           <p className="text-xs text-muted-foreground">
             {loading
-              ? "Loading users..."
+              ? "Fetching users..."
               : `${users.length} user${users.length === 1 ? "" : "s"} shown`}
           </p>
         </div>
@@ -287,9 +308,7 @@ export function AdminUsersScreen() {
       {/* User List */}
       <div className="animate-fade-in flex flex-col gap-2" style={{ animationDelay: "150ms" }}>
         {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Loading users...
-          </div>
+          <AdminUsersLoading />
         ) : error ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
             <p className="text-sm text-destructive">{error}</p>

@@ -2,7 +2,8 @@ import requests
 import io
 
 BASE_URL = "https://jpm-backend.onrender.com/api/v1"
-# BASE_URL = "http://localhost:8000/api/v1" # For local testing if needed
+# BASE_URL = "http://localhost:8000/api/v1" 
+# # For local testing if needed
 
 def login_user(email, password):
     print(f"Logging in: {email}...")

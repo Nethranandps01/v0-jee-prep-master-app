@@ -16,9 +16,7 @@ import {
 import {
   ArrowRight,
   BarChart3,
-  BookOpen,
   ChevronRight,
-  ClipboardList,
   FileText,
   FolderOpen,
   Sparkles,
@@ -26,6 +24,55 @@ import {
   Upload,
   Users,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function TeacherHomeLoading() {
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      {/* Stats Skeleton */}
+      <div className="flex gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <Skeleton className="h-6 w-12" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        ))}
+      </div>
+
+      {/* Action Buttons Skeleton */}
+      <div className="flex flex-col gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+            <Skeleton className="h-12 w-12 rounded-2xl" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+            <Skeleton className="h-5 w-5 rounded-md" />
+          </div>
+        ))}
+      </div>
+
+      {/* Performance Card Skeleton */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-4 rounded-sm" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        {[1, 2].map((i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <Skeleton className="h-2 w-full rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function TeacherHomeScreen() {
   const { userName, navigate, teacherSubject, authToken, teacherHomeData, setTeacherHomeData } = useApp();
@@ -72,7 +119,7 @@ export function TeacherHomeScreen() {
             lessons: lessonsRes,
           });
         }
-      } catch (err) {
+      } catch (err: any) {
         if (!cancelled) {
           if (err instanceof ApiError) {
             setError(err.detail);
@@ -107,13 +154,9 @@ export function TeacherHomeScreen() {
         </span>
       </div>
 
-      {loading && (
-        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Loading teacher dashboard...
-        </div>
-      )}
-
-      {!loading && error && (
+      {loading ? (
+        <TeacherHomeLoading />
+      ) : error ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{error}</p>
           <button
@@ -123,9 +166,7 @@ export function TeacherHomeScreen() {
             Retry
           </button>
         </div>
-      )}
-
-      {!loading && !error && summary && (
+      ) : summary ? (
         <>
           <div className="animate-fade-in flex gap-3" style={{ animationDelay: "100ms" }}>
             <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
@@ -187,7 +228,7 @@ export function TeacherHomeScreen() {
             style={{ animationDelay: "250ms" }}
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent">
-              <ClipboardList className="h-6 w-6 text-accent-foreground" />
+              <Sparkles className="h-6 w-6 text-accent-foreground" />
             </div>
             <div className="flex flex-1 flex-col gap-1">
               <span className="text-sm font-semibold text-foreground">Lesson Plans</span>
@@ -351,7 +392,7 @@ export function TeacherHomeScreen() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

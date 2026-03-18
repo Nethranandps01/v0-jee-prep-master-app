@@ -19,6 +19,32 @@ import {
     ShieldAlert,
     ChevronDown,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function TeacherStudentDetailsLoading() {
+    return (
+        <div className="flex flex-col gap-3 w-full animate-fade-in">
+            {[1, 2, 3].map((i) => (
+                <div key={i} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+                    <div className="flex items-start justify-between">
+                        <div className="flex flex-col gap-2 flex-1">
+                            <Skeleton className="h-4 w-3/4" />
+                            <div className="flex items-center gap-2">
+                                <Skeleton className="h-3.5 w-16 rounded-full" />
+                                <Skeleton className="h-2 w-20" />
+                            </div>
+                        </div>
+                        <Skeleton className="h-8 w-12 rounded-lg" />
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/50 pt-3">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-8 w-24 rounded-lg" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
 
 export function TeacherStudentDetailsScreen() {
     const { navigate, authToken, selectedStudentId } = useApp();
@@ -26,6 +52,7 @@ export function TeacherStudentDetailsScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [expandedAttempts, setExpandedAttempts] = useState<Set<string>>(new Set());
+    const [reloadKey, setReloadKey] = useState(0);
 
     const toggleAttempt = (attemptId: string) => {
         setExpandedAttempts((prev) => {
@@ -40,28 +67,39 @@ export function TeacherStudentDetailsScreen() {
     };
 
     useEffect(() => {
+        let cancelled = false;
         const fetchDetails = async () => {
             if (!authToken || !selectedStudentId) {
                 setLoading(false);
                 return;
             }
 
+            setLoading(true);
+            setError(null);
+
             try {
                 const data = await getStudentAttempts(authToken, selectedStudentId);
-                setAttempts(data);
-            } catch (err) {
-                if (err instanceof ApiError) {
-                    setError(err.detail);
-                } else {
-                    setError("Failed to load student details.");
+                if (!cancelled) {
+                    setAttempts(data);
+                }
+            } catch (err: any) {
+                if (!cancelled) {
+                    if (err instanceof ApiError) {
+                        setError(err.detail);
+                    } else {
+                        setError("Failed to load student details.");
+                    }
                 }
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         };
 
         void fetchDetails();
-    }, [authToken, selectedStudentId]);
+        return () => { cancelled = true; };
+    }, [authToken, selectedStudentId, reloadKey]);
 
     if (!selectedStudentId) {
         return (
@@ -91,12 +129,16 @@ export function TeacherStudentDetailsScreen() {
             </div>
 
             {loading ? (
-                <div className="flex h-40 items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
-                </div>
+                <TeacherStudentDetailsLoading />
             ) : error ? (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                    {error}
+                <div className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
+                    <p className="text-xs text-destructive">{error}</p>
+                    <button
+                        onClick={() => setReloadKey((v) => v + 1)}
+                        className="w-fit rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+                    >
+                        Retry
+                    </button>
                 </div>
             ) : attempts.length === 0 ? (
                 <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-6 text-center">

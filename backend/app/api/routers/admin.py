@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from fastapi.responses import Response
 from pymongo.database import Database
 
@@ -118,12 +118,25 @@ async def update_content_status(
 
 @router.get("/reports/analytics", response_model=AnalyticsReportResponse)
 async def analytics_report(db: Database = Depends(get_db)) -> AnalyticsReportResponse:
-    return AdminService.get_analytics_report(db)
+    cached = admin_cache.get("reports:analytics")
+    if cached:
+        return AnalyticsReportResponse(**cached)
+        
+    report = AdminService.get_analytics_report(db)
+    # Convert Pydantic model to dict for cache
+    admin_cache.set("reports:analytics", report.model_dump() if hasattr(report, "model_dump") else report)
+    return report
 
 
 @router.get("/reports/billing", response_model=BillingReportResponse)
 async def billing_report(db: Database = Depends(get_db)) -> BillingReportResponse:
-    return AdminService.get_billing_report(db)
+    cached = admin_cache.get("reports:billing")
+    if cached:
+        return BillingReportResponse(**cached)
+        
+    report = AdminService.get_billing_report(db)
+    admin_cache.set("reports:billing", report.model_dump() if hasattr(report, "model_dump") else report)
+    return report
 
 
 @router.get("/reports/export", response_model=None)
@@ -146,6 +159,7 @@ async def export_report(
 @router.post("/settings/jee-exam-date")
 async def set_jee_exam_date(
     payload: SetJeeExamDateRequest,
+    background_tasks: BackgroundTasks,
     db: Database = Depends(get_db),
 ) -> dict:
-    return AdminService.set_jee_exam_date(db, payload.jee_exam_date)
+    return AdminService.set_jee_exam_date(db, payload.jee_exam_date, background_tasks)

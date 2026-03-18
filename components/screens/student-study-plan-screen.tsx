@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, Circle, Clock, Calendar, BookOpen, AlertCircle, ChevronDown, Lock } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import {
@@ -26,9 +26,16 @@ export function StudentStudyPlanScreen() {
     const [activeQuizTask, setActiveQuizTask] = useState<StudyPlanTask | null>(null);
     const [quizData, setQuizData] = useState<QuizGenerateResponse | null>(null);
 
+    // Prevent duplicate initial plan fetch in React Strict Mode; plan is also cached via studentHomeData.
+    const hasFetchedRef = useRef(false);
+
     useEffect(() => {
         const loadPlan = async () => {
             if (!authToken) return;
+
+            if (hasFetchedRef.current) return;
+            hasFetchedRef.current = true;
+
             try {
                 const plan = await getStudyPlan(authToken);
                 setStudyPlan(plan);

@@ -18,82 +18,64 @@
   :root {
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    
+    /* Pastel Teal + Coral Theme (Mapped from lib/theme.ts) */
+    --background: 180 4% 95%;           /* #F3F4F4 */
+    --foreground: 198 22% 15%;          /* #1E2A2F */
+    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card-foreground: 198 22% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 60%;
+    --popover-foreground: 198 22% 15%;
+
+    /* Primary (Deep Teal) */
+    --primary: 186 59% 30%;             /* #1F6F78 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 160 84% 39%;
+
+    /* Secondary (Light Teal) */
+    --secondary: 186 33% 57%;           /* #6FAFB6 */
+    --secondary-foreground: 198 22% 15%;
+
+    /* Muted (Soft surfaces) */
+    --muted: 185 35% 86%;               /* #CFE6E8 */
+    --muted-foreground: 192 10% 41%;    /* #5F6F73 */
+
+    /* Accent (Soft Coral) */
+    --accent: 13 87% 66%;               /* #F47C5C */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+
+    /* Status */
+    --destructive: 6 78% 57%;           /* #E74C3C approx */
     --destructive-foreground: 0 0% 98%;
-    --warning: 25 95% 53%;
+    --warning: 13 87% 66%;
     --warning-foreground: 0 0% 100%;
-    --success: 160 84% 39%;
+    --success: 182 51% 37%;             /* #2D8C8F */
     --success-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 60%;
-    --chart-1: 217 91% 60%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 25 95% 53%;
-    --chart-4: 262 83% 58%;
-    --chart-5: 340 75% 55%;
-    --radius: 1rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 60%;
+
+    /* Borders / inputs */
+    --border: 195 15% 89%;              /* #E0E6E8 */
+    --input: 192 16% 94%;               /* #EDF1F2 */
+    --ring: 186 59% 30%;
+
+    /* Radius (12px as requested) */
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 44% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 44% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 55%;
-    --accent: 160 84% 39%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 0 0% 98%;
-    --warning: 25 95% 53%;
-    --warning-foreground: 0 0% 100%;
-    --success: 160 84% 39%;
-    --success-foreground: 0 0% 100%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
-    --chart-1: 217 91% 60%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 25 95% 53%;
-    --chart-4: 262 83% 58%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 222 44% 9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --background: 210 29% 10%;
+    --foreground: 210 20% 98%;
+    --card: 210 29% 12%;
+    --card-foreground: 210 20% 98%;
+    --popover: 210 29% 12%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 183 34% 65%;
+    --primary-foreground: 210 29% 10%;
+    --secondary: 40 76% 75%;
+    --secondary-foreground: 210 29% 10%;
+    --muted: 210 29% 15%;
+    --muted-foreground: 210 15% 70%;
+    --border: 210 29% 20%;
+    --input: 210 29% 20%;
+    --ring: 183 34% 65%;
   }
 }
 

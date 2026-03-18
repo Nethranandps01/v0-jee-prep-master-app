@@ -14,7 +14,17 @@ import {
 } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Send, Sparkles, User, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Send, User, Trash2 , Sparkles } from "lucide-react";
 
 interface Message {
   id: string;
@@ -68,6 +78,8 @@ export function AIChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -126,17 +138,31 @@ export function AIChatScreen() {
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation(); // Prevent selection
-    if (!authToken || !confirm("Are you sure you want to delete this chat?")) return;
+    if (!authToken) return;
+    setPendingDeleteSessionId(sessionId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!authToken || !pendingDeleteSessionId) return;
 
     try {
-      await deleteChatSession(authToken, sessionId);
-      setSessions(prev => prev.filter(s => s.id !== sessionId));
-      if (currentSessionId === sessionId) {
+      await deleteChatSession(authToken, pendingDeleteSessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== pendingDeleteSessionId));
+      if (currentSessionId === pendingDeleteSessionId) {
         handleNewChat();
       }
     } catch (err) {
       console.error("Failed to delete session", err);
+    } finally {
+      setDeleteDialogOpen(false);
+      setPendingDeleteSessionId(null);
     }
+  };
+
+  const cancelDeleteSession = () => {
+    setDeleteDialogOpen(false);
+    setPendingDeleteSessionId(null);
   };
 
   const handleSend = async (text?: string) => {
@@ -228,6 +254,26 @@ export function AIChatScreen() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Removed heavy radial gradient and blur-3xl for mobile performance */}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this chat and all its messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteSession}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmDeleteSession()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border bg-background transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>

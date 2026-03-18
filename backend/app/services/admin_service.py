@@ -1,11 +1,12 @@
 import csv
 import io
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, BackgroundTasks
 from pymongo.database import Database
 
+from app.core.cache import cache_get, cache_set
 from app.core.security import get_password_hash
 from app.schemas.admin import (
     AnalyticsReportResponse,
@@ -159,7 +160,7 @@ class AdminService:
 
         total = db.users.count_documents(query)
         cursor = (
-            db.users.find(query)
+            db.users.find(query, {"password_hash": 0})
             .sort("created_at", -1)
             .skip((page - 1) * limit)
             .limit(limit)
@@ -257,8 +258,16 @@ class AdminService:
             query["subject"] = subject
 
         total = db.content_items.count_documents(query)
+        projection = {
+            "title": 1,
+            "uploaded_by_name": 1,
+            "subject": 1,
+            "date": 1,
+            "status": 1,
+            "created_at": 1,
+        }
         cursor = (
-            db.content_items.find(query)
+            db.content_items.find(query, projection)
             .sort("created_at", -1)
             .skip((page - 1) * limit)
             .limit(limit)
@@ -388,6 +397,11 @@ class AdminService:
 
     @staticmethod
     def get_dashboard(db: Database) -> dict:
+        cache_key = "admin:dashboard:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            return cached
+
         total_students = db.users.count_documents({"role": "student", "status": "active"})
         total_teachers = db.users.count_documents({"role": "teacher", "status": "active"})
         active_tests = db.tests.count_documents({"status": {"$in": ["assigned", "active"]}})
@@ -485,7 +499,7 @@ class AdminService:
         if not recent_activity:
             recent_activity = AdminService._fallback_recent_activity(db, limit=5)
 
-        return {
+        result = {
             "total_students": total_students,
             "total_teachers": total_teachers,
             "active_tests": active_tests,
@@ -493,6 +507,9 @@ class AdminService:
             "departments": departments,
             "recent_activity": recent_activity,
         }
+
+        cache_set(cache_key, result, ttl=timedelta(seconds=60))
+        return result
 
     @staticmethod
     def _month_start(reference: datetime, month_delta: int = 0) -> datetime:
@@ -508,61 +525,75 @@ class AdminService:
 
     @staticmethod
     def get_analytics_report(db: Database) -> AnalyticsReportResponse:
+        cache_key = "admin:reports:analytics:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            # Reconstruct from dict
+            return AnalyticsReportResponse(**cached)
+
         dashboard = AdminService.get_dashboard(db)
-
         now = datetime.now(timezone.utc)
+        six_months_ago = AdminService._month_start(now, -5)
+
+        # 1. Aggregate Tests (Papers Created) per month
+        test_counts_pipeline = [
+            {"$match": {"created_at": {"$gte": six_months_ago}}},
+            {"$group": {
+                "_id": {"year": {"$year": "$created_at"}, "month": {"$month": "$created_at"}},
+                "count": {"$sum": 1}
+            }}
+        ]
+        tests_map = { (r["_id"]["year"], r["_id"]["month"]): r["count"] for r in db.tests.aggregate(test_counts_pipeline) }
+
+        # 2. Aggregate Attempt Submissions per month
+        attempt_counts_pipeline = [
+            {"$match": {"status": "submitted", "submitted_at": {"$gte": six_months_ago}}},
+            {"$group": {
+                "_id": {"year": {"$year": "$submitted_at"}, "month": {"$month": "$submitted_at"}},
+                "count": {"$sum": 1}
+            }}
+        ]
+        attempts_map = { (r["_id"]["year"], r["_id"]["month"]): r["count"] for r in db.test_attempts.aggregate(attempt_counts_pipeline) }
+
         monthly_usage = []
-
         for offset in range(-5, 1):
-            month_start = AdminService._month_start(now, offset)
-            next_month_start = AdminService._month_start(month_start, 1)
+            ms = AdminService._month_start(now, offset)
+            key = (ms.year, ms.month)
+            monthly_usage.append({
+                "month": ms.strftime("%b"),
+                "tests": attempts_map.get(key, 0), # 'tests' in response means attempts
+                "papers": tests_map.get(key, 0)
+            })
 
-            tests_count = db.test_attempts.count_documents(
-                {
-                    "status": "submitted",
-                    "submitted_at": {
-                        "$gte": month_start,
-                        "$lt": next_month_start,
-                    },
-                }
-            )
-            papers_count = db.tests.count_documents(
-                {
-                    "created_at": {
-                        "$gte": month_start,
-                        "$lt": next_month_start,
-                    }
-                }
-            )
-
-            monthly_usage.append(
-                {
-                    "month": month_start.strftime("%b"),
-                    "tests": int(tests_count),
-                    "papers": int(papers_count),
-                }
-            )
-
-        return AnalyticsReportResponse(
-            total_students=dashboard["total_students"],
-            total_teachers=dashboard["total_teachers"],
-            active_tests=dashboard["active_tests"],
-            pass_rate=dashboard["pass_rate"],
-            departments=dashboard["departments"],
-            monthly_usage=monthly_usage,
-        )
+        report_data = {
+            "total_students": dashboard["total_students"],
+            "total_teachers": dashboard["total_teachers"],
+            "active_tests": dashboard["active_tests"],
+            "pass_rate": dashboard["pass_rate"],
+            "departments": dashboard["departments"],
+            "monthly_usage": monthly_usage,
+        }
+        
+        cache_set(cache_key, report_data, ttl=timedelta(seconds=60))
+        return AnalyticsReportResponse(**report_data)
 
     @staticmethod
     def get_billing_report(db: Database) -> BillingReportResponse:
+        cache_key = "admin:reports:billing:v1"
+        cached = cache_get(cache_key)
+        if cached:
+            return BillingReportResponse(**cached)
+
         doc = db.billing_reports.find_one(sort=[("created_at", -1)])
         if not doc:
-            return BillingReportResponse(
+            res = BillingReportResponse(
                 plan="N/A",
                 students_allowed=0,
                 students_used=0,
                 monthly_usage=[],
                 renewal_date="N/A",
             )
+            return res
 
         monthly_usage = [
             {
@@ -572,13 +603,16 @@ class AdminService:
             }
             for item in doc.get("monthly_usage", [])
         ]
-        return BillingReportResponse(
-            plan=doc.get("plan", "N/A"),
-            students_allowed=int(doc.get("students_allowed", 0)),
-            students_used=int(doc.get("students_used", 0)),
-            monthly_usage=monthly_usage,
-            renewal_date=doc.get("renewal_date", "N/A"),
-        )
+        res_data = {
+            "plan": doc.get("plan", "N/A"),
+            "students_allowed": int(doc.get("students_allowed", 0)),
+            "students_used": int(doc.get("students_used", 0)),
+            "monthly_usage": monthly_usage,
+            "renewal_date": doc.get("renewal_date", "N/A"),
+        }
+        
+        cache_set(cache_key, res_data, ttl=timedelta(seconds=60))
+        return BillingReportResponse(**res_data)
 
     @staticmethod
     def export_csv(db: Database, section: str) -> str:
@@ -623,25 +657,31 @@ class AdminService:
 
         return output.getvalue()
     @staticmethod
-    def set_jee_exam_date(db: Database, jee_date: datetime) -> dict:
+    def set_jee_exam_date(db: Database, jee_date: datetime, background_tasks: BackgroundTasks) -> dict:
         """
-        Sets the global JEE exam date and triggers bulk plan generation.
+        Sets the global JEE exam date and triggers background bulk plan generation.
+        Optimized to return in <300ms by offloading generation work.
         """
+        # 1. Update global setting immediately
         db.settings.update_one(
             {"key": "global_jee_date"},
             {"$set": {"value": jee_date, "updated_at": datetime.now(timezone.utc)}},
             upsert=True
         )
         
-        # Trigger bulk generation
-        count = PlannerService.bulk_generate_plans(db, jee_date)
+        # 2. Pre-calculate count for accurate response
+        count = db.users.count_documents({"role": "student", "status": "active"})
+        
+        # 3. Offload work to background background_tasks to meet <300ms requirement
+        # This will process in the background without blocking the HTTP response.
+        background_tasks.add_task(PlannerService.bulk_generate_plans, db, jee_date)
         
         ActivityService.log(
             db,
-            text=f"Admin set global JEE exam date to {jee_date.strftime('%Y-%m-%d')} and updated {count} student plans",
+            text=f"Admin set global JEE exam date to {jee_date.strftime('%Y-%m-%d')}. Updating {count} student plans in background.",
             event_type="event",
             actor_role="admin",
-            metadata={"jee_date": jee_date.isoformat(), "count": count},
+            metadata={"jee_date": jee_date.isoformat(), "count": count, "mode": "background_sync"},
         )
         
-        return {"message": f"Global JEE exam date set. {count} student plans updated.", "count": count}
+        return {"message": f"Global JEE exam date set. {count} student plans are being updated in background.", "count": count}

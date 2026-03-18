@@ -8,14 +8,80 @@ import {
   StudentProgressResponse,
   StudentTestResponse,
   StudyPlanResponse,
-  getStudentHomeSummary,
-  getStudentProgress,
-  getStudyPlan,
-  listStudentTests,
 } from "@/lib/api-client";
+import { useStudentDashboard } from "@/hooks/use-student-dashboard";
+import { useStudentStudyPlan } from "@/hooks/use-student-study-plan";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function StudentHomeLoading() {
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      {/* Stats Skeleton */}
+      <div className="flex gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <Skeleton className="h-6 w-12" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        ))}
+      </div>
+
+      {/* Subject Scores Skeleton */}
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32 mb-1" />
+        <div className="flex gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-1 flex-col items-center gap-2 rounded-2xl border border-border bg-card p-3">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <Skeleton className="h-6 w-12" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Study Plan Skeleton */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div className="flex flex-col gap-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-2 w-16" />
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-2 w-20" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 mt-2">
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-10" />
+          </div>
+          <Skeleton className="h-1.5 w-full rounded-full" />
+        </div>
+        <Skeleton className="h-10 w-full rounded-xl mt-1" />
+      </div>
+
+      {/* AI Assistant Skeleton */}
+      <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+        <Skeleton className="h-12 w-12 rounded-2xl" />
+        <div className="flex flex-1 flex-col gap-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-full" />
+        </div>
+        <Skeleton className="h-5 w-5 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
 import {
-  Flame,
+  Zap,
   Target,
   TrendingUp,
   Clock,
@@ -60,68 +126,71 @@ export function StudentHomeScreen() {
   const [progress, setProgress] = useState<StudentProgressResponse | null>(studentHomeData?.progress || null);
   const [studyPlan, setStudyPlan] = useState<StudyPlanResponse | null>(studentHomeData?.studyPlan || null);
 
-  // SWR: If we have data, we are NOT loading (from the UI perspective)
   const [loading, setLoading] = useState(!studentHomeData);
   const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+
+  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, refetch } =
+    useStudentDashboard(authToken);
+  const {
+    data: plan,
+    isLoading: planLoading,
+    error: planError,
+  } = useStudentStudyPlan(authToken);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!authToken) {
+      setError("Student login is required.");
+      setLoading(false);
+      return;
+    }
 
-    const loadData = async () => {
-      if (!authToken) {
-        setError("Student login is required.");
-        setLoading(false);
-        return;
-      }
+    if (!studentHomeData) {
+      setLoading(dashboardLoading || planLoading);
+    }
 
-      // SWR: Only show loader if we have NO data
-      if (!studentHomeData) {
-        setLoading(true);
+    if (dashboardError || planError) {
+      const err = (dashboardError || planError) as unknown;
+      if (err instanceof ApiError) {
+        setError(err.detail);
+      } else {
+        setError("Failed to load dashboard data.");
       }
+      setLoading(false);
+      return;
+    }
+
+    if (dashboard) {
+      setSummary(dashboard.home);
+      setProgress(dashboard.progress);
+      setTests(dashboard.tests);
+    }
+
+    if (plan) {
+      setStudyPlan(plan);
+    }
+
+    if (dashboard || plan) {
+      setStudentHomeData({
+        summary: dashboard?.home ?? summary,
+        progress: dashboard?.progress ?? progress,
+        tests: dashboard?.tests ?? tests,
+        studyPlan: plan ?? studyPlan,
+      });
       setError(null);
-
-      try {
-        const [summaryResponse, progressResponse, testsResponse, planResponse] = await Promise.all([
-          getStudentHomeSummary(authToken),
-          getStudentProgress(authToken),
-          listStudentTests(authToken),
-          getStudyPlan(authToken).catch(() => null),
-        ]);
-
-        if (!cancelled) {
-          setSummary(summaryResponse);
-          setProgress(progressResponse);
-          setTests(testsResponse);
-          setStudyPlan(planResponse);
-          setStudentHomeData({
-            summary: summaryResponse,
-            progress: progressResponse,
-            tests: testsResponse,
-            studyPlan: planResponse,
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          if (err instanceof ApiError) {
-            setError(err.detail);
-          } else {
-            setError("Failed to load dashboard data.");
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void loadData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authToken, reloadKey]);
+      setLoading(false);
+    }
+  }, [
+    authToken,
+    dashboard,
+    dashboardLoading,
+    dashboardError,
+    plan,
+    planLoading,
+    planError,
+    studentHomeData,
+    studyPlan,
+    setStudentHomeData,
+  ]);
 
   const assignedTests = useMemo(
     () => tests.filter((test) => test.status === "assigned"),
@@ -167,7 +236,7 @@ export function StudentHomeScreen() {
   }, [studyPlan]);
 
   const progressPercentage = useMemo(() => {
-    if (!studyPlan || !studyPlan.tasks || studyPlan.tasks.length === 0) return 35; // Default if not found
+    if (!studyPlan || !studyPlan.tasks || studyPlan.tasks.length === 0) return 35;
     const completed = studyPlan.tasks.filter(t => t.status === "completed").length;
     return Math.round((completed / studyPlan.tasks.length) * 100);
   }, [studyPlan]);
@@ -192,302 +261,302 @@ export function StudentHomeScreen() {
         <h1 className="text-2xl font-bold text-foreground text-balance">{userName || "Student"}</h1>
       </div>
 
-      {error && (
+      {loading ? (
+        <StudentHomeLoading />
+      ) : error ? (
         <div className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
           <p className="text-xs text-destructive">{error}</p>
           <button
-            onClick={() => setReloadKey((value) => value + 1)}
+            onClick={() => {
+              setLoading(true);
+              void refetch();
+            }}
             className="w-fit rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
           >
             Retry
           </button>
         </div>
-      )}
-
-      <div className="animate-fade-in flex gap-3" style={{ animationDelay: "100ms" }}>
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15">
-            <Flame className="h-5 w-5 text-warning" />
-          </div>
-          <span className="text-lg font-bold text-foreground">{loading ? "--" : streak}</span>
-          <span className="text-[11px] text-muted-foreground">Day Streak</span>
-        </div>
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15">
-            <Target className="h-5 w-5 text-primary" />
-          </div>
-          <span className="text-lg font-bold text-foreground">
-            {loading ? "--" : `${avgScore.toFixed(1)}%`}
-          </span>
-          <span className="text-[11px] text-muted-foreground">Avg Score</span>
-        </div>
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15">
-            <TrendingUp className="h-5 w-5 text-accent" />
-          </div>
-          <span className="text-lg font-bold text-foreground">{loading ? "--" : `#${overallRank}`}</span>
-          <span className="text-[11px] text-muted-foreground">Rank</span>
-        </div>
-      </div>
-
-      <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "150ms" }}>
-        <h2 className="text-base font-semibold text-foreground">Subject Scores</h2>
-        <div className="flex gap-3">
-          {subjectStats.map((item) => {
-            const Icon = subjectIcons[item.subject] || BookOpen;
-            return (
-              <div
-                key={item.subject}
-                className="flex flex-1 flex-col items-center gap-2 rounded-2xl border border-border bg-card p-3"
-              >
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${item.subject === "Physics"
-                    ? "bg-primary/15"
-                    : item.subject === "Chemistry"
-                      ? "bg-accent/15"
-                      : "bg-warning/15"
-                    }`}
-                >
-                  <Icon
-                    className={`h-4 w-4 ${item.subject === "Physics"
-                      ? "text-primary"
-                      : item.subject === "Chemistry"
-                        ? "text-accent"
-                        : "text-warning"
-                      }`}
-                  />
-                </div>
-                <span className="text-lg font-bold text-foreground">
-                  {item.latest === null ? "--" : `${item.latest}%`}
-                </span>
-                <span className="text-[10px] text-muted-foreground text-center">{item.subject}</span>
+      ) : (
+        <>
+          <div className="animate-fade-in flex gap-3" style={{ animationDelay: "100ms" }}>
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15">
+                <Zap className="h-5 w-5 text-warning" />
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Study Plan Card */}
-      <button
-        onClick={() => navigate("student-study-plan")}
-        className="animate-fade-in flex flex-col gap-4 rounded-2xl border border-accent/20 bg-accent/5 p-5 text-left transition-colors hover:bg-accent/10"
-        style={{ animationDelay: "150ms" }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-              <Clock className="h-5 w-5 text-accent-foreground" />
+              <span className="text-lg font-bold text-foreground">{streak}</span>
+              <span className="text-[11px] text-muted-foreground">Day Streak</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-foreground">My Study Plan</span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Active Timeline</span>
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <span className="text-lg font-bold text-foreground">
+                {`${avgScore.toFixed(1)}%`}
+              </span>
+              <span className="text-[11px] text-muted-foreground">Avg Score</span>
+            </div>
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15">
+                <TrendingUp className="h-5 w-5 text-accent" />
+              </div>
+              <span className="text-lg font-bold text-foreground">#{overallRank}</span>
+              <span className="text-[11px] text-muted-foreground">Rank</span>
             </div>
           </div>
-          <div className="flex flex-col items-end">
-            <span className="text-xs font-bold text-accent">JEE {studyPlan?.target_exam_date ? new Date(studyPlan.target_exam_date).getFullYear() : "2026"}</span>
-            <span className="text-[10px] text-muted-foreground">{daysRemaining !== null ? `${daysRemaining} Days Left` : "Target Date"}</span>
-          </div>
-        </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted-foreground font-medium">Daily Goal: {studyPlan?.availability_hours ?? 4} Hours</span>
-            <span className="text-accent font-bold">{progressPercentage}% Complete</span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent/20">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${progressPercentage}%` }} />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-xl bg-background/50 p-2.5">
-          <Sparkles className="h-3.5 w-3.5 text-accent" />
-          <span className="text-[11px] font-medium text-foreground line-clamp-1">
-            {nextTask ? `Next: ${nextTask.title} - ${nextTask.topic}` : "Plan your first study session"}
-          </span>
-          <ChevronRight className="ml-auto h-3 w-3 text-muted-foreground" />
-        </div>
-      </button>
-
-      <button
-        onClick={() => navigate("ai-chat")}
-        className="animate-fade-in flex items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
-        style={{ animationDelay: "200ms" }}
-      >
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary">
-          <Sparkles className="h-6 w-6 text-primary-foreground" />
-        </div>
-        <div className="flex flex-1 flex-col gap-1">
-          <span className="text-sm font-semibold text-foreground">AI Study Assistant</span>
-          <span className="text-xs text-muted-foreground">
-            Ask doubts, get explanations, practice problems
-          </span>
-        </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-      </button>
-
-      <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "300ms" }}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">Upcoming Tests</h2>
-          <button
-            onClick={() => navigate("student-tests")}
-            className="flex items-center gap-1 text-xs font-medium text-primary"
-          >
-            View All <ArrowRight className="h-3 w-3" />
-          </button>
-        </div>
-        <div className="flex flex-col gap-3">
-          {loading && (
-            <div className="rounded-2xl border border-border bg-card p-6 text-center">
-              <p className="text-sm text-muted-foreground">Loading tests...</p>
-            </div>
-          )}
-          {!loading && assignedTests.length === 0 && (
-            <div className="rounded-2xl border border-border bg-card p-6 text-center">
-              <p className="text-sm text-muted-foreground">No upcoming tests for {year} class</p>
-            </div>
-          )}
-          {!loading &&
-            assignedTests.slice(0, 3).map((test) => (
-              <button
-                key={test.id}
-                onClick={() => {
-                  setActiveTestId(test.id);
-                  setActiveAttemptId(null);
-                  setCompletedTestId(null);
-                  navigate("student-test-active");
-                }}
-                className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/50"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <BookOpen className="h-6 w-6 text-primary" />
-                </div>
-                <div className="flex flex-1 flex-col gap-1">
-                  <span className="text-sm font-semibold text-foreground">{test.title}</span>
-                  <span className="text-xs text-muted-foreground">{test.subject}</span>
-                  <div className="flex items-center gap-3 pt-1">
-                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {test.duration} min
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">{test.questions} Qs</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${test.difficulty === "Hard"
-                        ? "bg-destructive/15 text-destructive"
-                        : test.difficulty === "Medium"
-                          ? "bg-warning/15 text-warning"
-                          : "bg-accent/15 text-accent"
+          <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "150ms" }}>
+            <h2 className="text-base font-semibold text-foreground">Subject Scores</h2>
+            <div className="flex gap-3">
+              {subjectStats.map((item) => {
+                const Icon = subjectIcons[item.subject] || BookOpen;
+                return (
+                  <div
+                    key={item.subject}
+                    className="flex flex-1 flex-col items-center gap-2 rounded-2xl border border-border bg-card p-3"
+                  >
+                    <div
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg ${item.subject === "Physics"
+                        ? "bg-primary/15"
+                        : item.subject === "Chemistry"
+                          ? "bg-accent/15"
+                          : "bg-warning/15"
                         }`}
                     >
-                      {test.difficulty}
+                      <Icon
+                        className={`h-4 w-4 ${item.subject === "Physics"
+                          ? "text-primary"
+                          : item.subject === "Chemistry"
+                            ? "text-accent"
+                            : "text-warning"
+                          }`}
+                      />
+                    </div>
+                    <span className="text-lg font-bold text-foreground">
+                      {item.latest === null ? "--" : `${item.latest}%`}
                     </span>
+                    <span className="text-[10px] text-muted-foreground text-center">{item.subject}</span>
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] text-muted-foreground">{formatDate(test.created_at)}</span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </button>
-            ))}
-        </div>
-      </div>
-
-      <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "400ms" }}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">Recent Results</h2>
-          <button
-            onClick={() => navigate("student-progress")}
-            className="flex items-center gap-1 text-xs font-medium text-primary"
-          >
-            View All <ArrowRight className="h-3 w-3" />
-          </button>
-        </div>
-        <div className="flex flex-col gap-3">
-          {!loading && completedTests.length === 0 && (
-            <div className="rounded-2xl border border-border bg-card p-6 text-center">
-              <p className="text-sm text-muted-foreground">No results yet</p>
+                );
+              })}
             </div>
-          )}
-          {!loading &&
-            completedTests.slice(0, 3).map((test) => (
-              <button
-                key={test.id}
-                onClick={() => {
-                  if (!test.attempt_id) return;
-                  setCompletedTestId(test.attempt_id);
-                  navigate("student-results");
-                }}
-                className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/50"
-              >
-                <div className="relative flex h-12 w-12 items-center justify-center">
-                  <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48">
-                    <circle
-                      cx="24"
-                      cy="24"
-                      r="20"
-                      fill="none"
-                      stroke="hsl(var(--muted))"
-                      strokeWidth="4"
-                    />
-                    <circle
-                      cx="24"
-                      cy="24"
-                      r="20"
-                      fill="none"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeDasharray={`${((test.score ?? 0) / 100) * 125.6} 125.6`}
-                    />
-                  </svg>
-                  <span className="absolute text-xs font-bold text-foreground">{test.score ?? 0}%</span>
-                </div>
-                <div className="flex flex-1 flex-col gap-1">
-                  <span className="text-sm font-semibold text-foreground">{test.title}</span>
-                  <span className="text-xs text-muted-foreground">{test.subject}</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            ))}
-        </div>
-      </div>
+          </div>
 
-      <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "500ms" }}>
-        <h2 className="text-base font-semibold text-foreground">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            onClick={() => navigate("student-library")}
-            className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
+          {/* Study Plan Card */}
+          <button
+            onClick={() => navigate("student-study-plan")}
+            className="animate-fade-in flex flex-col gap-4 rounded-2xl border border-accent/20 bg-accent/5 p-5 text-left transition-colors hover:bg-accent/10"
+            style={{ animationDelay: "150ms" }}
           >
-            <BookOpen className="h-6 w-6 text-primary" />
-            <span className="text-xs font-medium">Study Material</span>
-          </Button>
-          <Button
-            variant="outline"
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
+                  <Clock className="h-5 w-5 text-accent-foreground" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground">My Study Plan</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Active Timeline</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-xs font-bold text-accent">JEE {studyPlan?.target_exam_date ? new Date(studyPlan.target_exam_date).getFullYear() : "2026"}</span>
+                <span className="text-[10px] text-muted-foreground">{daysRemaining !== null ? `${daysRemaining} Days Left` : "Target Date"}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground font-medium">Daily Goal: {studyPlan?.availability_hours ?? 4} Hours</span>
+                <span className="text-accent font-bold">{progressPercentage}% Complete</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent/20">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${progressPercentage}%` }} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-xl bg-background/50 p-2.5">
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              <span className="text-[11px] font-medium text-foreground line-clamp-1">
+                {nextTask ? `Next: ${nextTask.title} - ${nextTask.topic}` : "Plan your first study session"}
+              </span>
+              <ChevronRight className="ml-auto h-3 w-3 text-muted-foreground" />
+            </div>
+          </button>
+
+          <button
             onClick={() => navigate("ai-chat")}
-            className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
+            className="animate-fade-in flex items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
+            style={{ animationDelay: "200ms" }}
           >
-            <Sparkles className="h-6 w-6 text-accent" />
-            <span className="text-xs font-medium">Ask AI</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate("student-progress")}
-            className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
-          >
-            <TrendingUp className="h-6 w-6 text-warning" />
-            <span className="text-xs font-medium">My Progress</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate("student-tests")}
-            className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
-          >
-            <Target className="h-6 w-6 text-primary" />
-            <span className="text-xs font-medium">All Tests</span>
-          </Button>
-        </div>
-      </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary">
+              <Sparkles className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div className="flex flex-1 flex-col gap-1">
+              <span className="text-sm font-semibold text-foreground">AI Study Assistant</span>
+              <span className="text-xs text-muted-foreground">
+                Ask doubts, get explanations, practice problems
+              </span>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </button>
+
+          <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "300ms" }}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground">Upcoming Tests</h2>
+              <button
+                onClick={() => navigate("student-tests")}
+                className="flex items-center gap-1 text-xs font-medium text-primary"
+              >
+                View All <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {assignedTests.length === 0 && (
+                <div className="rounded-2xl border border-border bg-card p-6 text-center">
+                  <p className="text-sm text-muted-foreground">No upcoming tests for {year} class</p>
+                </div>
+              )}
+              {assignedTests.slice(0, 3).map((test) => (
+                <button
+                  key={test.id}
+                  onClick={() => {
+                    setActiveTestId(test.id);
+                    setActiveAttemptId(null);
+                    setCompletedTestId(null);
+                    navigate("student-test-active");
+                  }}
+                  className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                    <BookOpen className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1">
+                    <span className="text-sm font-semibold text-foreground">{test.title}</span>
+                    <span className="text-xs text-muted-foreground">{test.subject}</span>
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {test.duration} min
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{test.questions} Qs</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${test.difficulty === "Hard"
+                          ? "bg-destructive/15 text-destructive"
+                          : test.difficulty === "Medium"
+                            ? "bg-warning/15 text-warning"
+                            : "bg-accent/15 text-accent"
+                          }`}
+                      >
+                        {test.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] text-muted-foreground">{formatDate(test.created_at)}</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "400ms" }}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground">Recent Results</h2>
+              <button
+                onClick={() => navigate("student-progress")}
+                className="flex items-center gap-1 text-xs font-medium text-primary"
+              >
+                View All <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {completedTests.length === 0 && (
+                <div className="rounded-2xl border border-border bg-card p-6 text-center">
+                  <p className="text-sm text-muted-foreground">No results yet</p>
+                </div>
+              )}
+              {completedTests.slice(0, 3).map((test) => (
+                <button
+                  key={test.id}
+                  onClick={() => {
+                    if (!test.attempt_id) return;
+                    setCompletedTestId(test.attempt_id);
+                    navigate("student-results");
+                  }}
+                  className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/50"
+                >
+                  <div className="relative flex h-12 w-12 items-center justify-center">
+                    <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48">
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="20"
+                        fill="none"
+                        stroke="hsl(var(--muted))"
+                        strokeWidth="4"
+                      />
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="20"
+                        fill="none"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeDasharray={`${((test.score ?? 0) / 100) * 125.6} 125.6`}
+                      />
+                    </svg>
+                    <span className="absolute text-xs font-bold text-foreground">{test.score ?? 0}%</span>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1">
+                    <span className="text-sm font-semibold text-foreground">{test.title}</span>
+                    <span className="text-xs text-muted-foreground">{test.subject}</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="animate-fade-in flex flex-col gap-3" style={{ animationDelay: "500ms" }}>
+            <h2 className="text-base font-semibold text-foreground">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate("student-library")}
+                className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
+              >
+                <BookOpen className="h-6 w-6 text-primary" />
+                <span className="text-xs font-medium">Study Material</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("ai-chat")}
+                className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
+              >
+                <Sparkles className="h-6 w-6 text-accent" />
+                <span className="text-xs font-medium">Ask AI</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("student-progress")}
+                className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
+              >
+                <TrendingUp className="h-6 w-6 text-warning" />
+                <span className="text-xs font-medium">My Progress</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("student-tests")}
+                className="flex h-auto flex-col items-center gap-2 rounded-2xl border-border bg-card p-4 text-foreground hover:bg-muted/50"
+              >
+                <Target className="h-6 w-6 text-primary" />
+                <span className="text-xs font-medium">All Tests</span>
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

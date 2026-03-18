@@ -19,6 +19,32 @@ import {
   FileText,
   Filter,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function AdminContentLoading() {
+  return (
+    <div className="flex flex-col gap-3 w-full animate-fade-in">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
+          <div className="flex items-start gap-3">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-3/4" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-2.5 w-20" />
+                <Skeleton className="h-2.5 w-12" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-3.5 w-14 rounded-full" />
+                <Skeleton className="h-3.5 w-16 rounded-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -41,28 +67,21 @@ export function AdminContentScreen() {
     { label: "Rejected", value: "rejected" },
   ];
 
-  const [logs, setLogs] = useState<string[]>([]);
-  const addLog = (msg: string) => setLogs(prev => [...prev, `${new Date().toISOString().split('T')[1]} ${msg}`]);
-
   useEffect(() => {
     let cancelled = false;
 
     const loadItems = async () => {
-      addLog("Starting loadItems");
       if (!authToken) {
-        addLog("No auth token");
         setItems([]);
         setLoading(false);
         setError("Admin login is required to moderate content.");
         return;
       }
 
-      addLog(`Token present: ${authToken.substring(0, 10)}...`);
       setLoading(true);
       setError(null);
 
       try {
-        addLog("Calling listAdminContentItems...");
         const response = await listAdminContentItems(authToken, {
           status: statusFilter === "all" ? undefined : statusFilter,
           subject: subjectFilter === "All" ? undefined : subjectFilter,
@@ -71,16 +90,10 @@ export function AdminContentScreen() {
         });
 
         if (!cancelled) {
-          addLog(`Success! Got ${response.items.length} items`);
           setItems(response.items);
-        } else {
-          addLog("Cancelled after success");
         }
       } catch (err: any) {
         if (!cancelled) {
-          addLog(`Error: ${err.message || err}`);
-          if (err.detail) addLog(`Detail: ${err.detail}`);
-
           setItems([]);
           if (err instanceof ApiError) {
             setError(err.detail);
@@ -90,7 +103,6 @@ export function AdminContentScreen() {
         }
       } finally {
         if (!cancelled) {
-          addLog("Finally block - loading false");
           setLoading(false);
         }
       }
@@ -135,7 +147,7 @@ export function AdminContentScreen() {
       <div className="animate-fade-in flex flex-col gap-1">
         <h1 className="text-xl font-bold text-foreground">Content Moderation</h1>
         <p className="text-xs text-muted-foreground">
-          {pendingCount} item{pendingCount !== 1 ? "s" : ""} pending review
+          {loading ? 'Fetching...' : `${pendingCount} item${pendingCount !== 1 ? "s" : ""} pending review`}
         </p>
       </div>
 
@@ -184,9 +196,7 @@ export function AdminContentScreen() {
       {/* Content List */}
       <div className="animate-fade-in flex flex-col gap-2" style={{ animationDelay: "150ms" }}>
         {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Loading content items...
-          </div>
+          <AdminContentLoading />
         ) : error ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
             <p className="text-sm text-destructive">{error}</p>
@@ -276,13 +286,6 @@ export function AdminContentScreen() {
           ))
         )}
       </div>
-
-      {/* Debug Logs */}
-      <div className="mt-4 max-h-40 overflow-y-auto rounded bg-black/80 p-2 text-[10px] font-mono text-green-400">
-        {logs.map((log, i) => (
-          <div key={i}>{log}</div>
-        ))}
-      </div>
-    </div>
+   </div>
   );
 }

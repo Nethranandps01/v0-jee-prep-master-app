@@ -20,13 +20,16 @@ class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db: str = "jpee"
 
-    jwt_secret_key: str = "change-me-in-production"
+    jwt_secret_key: str = "2c7f47c8b7f24c3ea9f4e4a9d9b1a8a1f4c3e2d9a7b5c1d0f9e8c7a6b5d4c3"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 14
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+
+    # Optional Redis connection URL, e.g. redis://localhost:6379/0
+    redis_url: str | None = None
 
     cors_origins: list[str] = Field(
         default_factory=lambda: [

@@ -20,6 +20,28 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function TeacherLibraryLoading() {
+  return (
+    <div className="flex flex-col gap-3 w-full animate-fade-in">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-4 w-1/2" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-2.5 w-12" />
+              <Skeleton className="h-2.5 w-16" />
+              <Skeleton className="h-2.5 w-10" />
+              <Skeleton className="h-3.5 w-14 rounded-full" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type MaterialType = "PDF" | "Question Bank" | "DOCX" | "Image";
 
@@ -170,7 +192,7 @@ export function TeacherLibraryScreen() {
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-bold text-foreground">Library</h1>
-          <p className="text-sm text-muted-foreground">Manage study materials</p>
+          <p className="text-sm text-muted-foreground">{loading ? 'Fetching...' : 'Manage study materials'}</p>
         </div>
         <Button
           className="gap-2 rounded-xl bg-primary text-primary-foreground"
@@ -198,101 +220,81 @@ export function TeacherLibraryScreen() {
         />
       </div>
 
-      <div className="flex gap-3">
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-3">
-          <FileText className="h-5 w-5 text-primary" />
-          <span className="text-sm font-bold text-foreground">{stats.pdfs}</span>
-          <span className="text-[10px] text-muted-foreground">PDFs</span>
+      {loading ? (
+        <TeacherLibraryLoading />
+      ) : error ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{error}</p>
+          <button
+            onClick={() => setReloadKey((value) => value + 1)}
+            className="w-fit rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+          >
+            Retry
+          </button>
         </div>
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-3">
-          <BookOpen className="h-5 w-5 text-accent" />
-          <span className="text-sm font-bold text-foreground">{stats.qbanks}</span>
-          <span className="text-[10px] text-muted-foreground">Q Banks</span>
+      ) : items.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-8 text-center flex flex-col items-center gap-2">
+          <FolderOpen className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No materials found</p>
         </div>
-        <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-3">
-          <FolderOpen className="h-5 w-5 text-warning" />
-          <span className="text-sm font-bold text-foreground">{stats.chapters}</span>
-          <span className="text-[10px] text-muted-foreground">Chapters</span>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex gap-3">
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-3">
+              <FileText className="h-5 w-5 text-primary" />
+              <span className="text-sm font-bold text-foreground">{stats.pdfs}</span>
+              <span className="text-[10px] text-muted-foreground">PDFs</span>
+            </div>
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-3">
+              <BookOpen className="h-5 w-5 text-accent" />
+              <span className="text-sm font-bold text-foreground">{stats.qbanks}</span>
+              <span className="text-[10px] text-muted-foreground">Q Banks</span>
+            </div>
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border border-border bg-card p-3">
+              <FolderOpen className="h-5 w-5 text-warning" />
+              <span className="text-sm font-bold text-foreground">{stats.chapters}</span>
+              <span className="text-[10px] text-muted-foreground">Chapters</span>
+            </div>
+          </div>
 
-      <div className="flex flex-col gap-3">
-        {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Loading materials...
-          </div>
-        ) : error ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
-            <p className="text-sm text-destructive">{error}</p>
-            <button
-              onClick={() => setReloadKey((value) => value + 1)}
-              className="w-fit rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
-            >
-              Retry
-            </button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">No materials found</p>
-          </div>
-        ) : (
-          filtered.map((item, index) => (
-            <div
-              key={item.id}
-              className="animate-fade-in flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
-              style={{ animationDelay: `${index * 80}ms` }}
-            >
+          <div className="flex flex-col gap-3">
+            {filtered.map((item, index) => (
               <div
-                className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                  item.subject === "Physics"
-                    ? "bg-primary/10"
-                    : item.subject === "Chemistry"
-                    ? "bg-accent/10"
-                    : item.subject === "Mathematics"
-                    ? "bg-warning/10"
-                    : "bg-muted"
-                }`}
+                key={item.id}
+                className="animate-fade-in flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
+                style={{ animationDelay: `${index * 80}ms` }}
               >
-                <FileText
-                  className={`h-6 w-6 ${
-                    item.subject === "Physics"
-                      ? "text-primary"
-                      : item.subject === "Chemistry"
-                      ? "text-accent"
-                      : item.subject === "Mathematics"
-                      ? "text-warning"
-                      : "text-muted-foreground"
-                  }`}
-                />
-              </div>
-              <div className="flex flex-1 flex-col gap-1">
-                <span className="text-sm font-semibold text-foreground">{item.title}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">{item.subject}</span>
-                  <span className="text-xs text-muted-foreground">{item.chapters} chapters</span>
-                  <span className="text-xs text-muted-foreground">{item.type}</span>
-                  {item.file_name && (
-                    <span className="max-w-[200px] truncate text-xs text-muted-foreground">
-                      {item.file_name}
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-xl bg-muted/40`}
+                >
+                  <FileText
+                    className={`h-6 w-6 text-primary`}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1">
+                  <span className="text-sm font-semibold text-foreground">{item.title}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">{item.subject}</span>
+                    <span className="text-xs text-muted-foreground">{item.chapters} ch</span>
+                    <span className="text-xs text-muted-foreground">{item.type}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        item.status === "approved"
+                          ? "bg-accent/15 text-accent"
+                          : item.status === "pending"
+                          ? "bg-warning/15 text-warning"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {item.status ?? "available"}
                     </span>
-                  )}
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      item.status === "approved"
-                        ? "bg-accent/15 text-accent"
-                        : item.status === "pending"
-                        ? "bg-warning/15 text-warning"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {item.status ?? "available"}
-                  </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {showCreateForm && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm">

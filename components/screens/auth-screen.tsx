@@ -18,7 +18,11 @@ import {
   GraduationCap,
   Shield,
   Zap,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "next-themes";
+import { theme } from "@/lib/theme";
 
 type AuthStep = "role" | "login";
 type AuthMode = "signin" | "signup";
@@ -62,6 +66,9 @@ export function AuthScreen() {
     clearAuth,
   } = useApp();
 
+  const { theme: currentTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
   const [step, setStep] = useState<AuthStep>("role");
   const [mode, setMode] = useState<AuthMode>("signin");
   const [selectedRole, setSelectedRole] = useState<RoleOption | null>(null);
@@ -72,6 +79,10 @@ export function AuthScreen() {
   const [year, setYear] = useState<"11th" | "12th">("12th");
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!selectedRole) return;
@@ -189,63 +200,84 @@ export function AuthScreen() {
     }
   };
 
+  const toggleTheme = () => {
+    setTheme(currentTheme === "dark" ? "light" : "dark");
+  };
+
+  if (!mounted) return null;
+
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <div className="flex items-center gap-2 px-6 pt-12">
-        {step !== "role" && (
-          <button
-            onClick={handleBack}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        )}
-        <Zap className="h-5 w-5 text-primary" />
-        <span className="text-sm font-semibold text-foreground">JEE Prep Master</span>
+    <div className="flex min-h-screen flex-col bg-background text-foreground transition-colors duration-300">
+      <div className="flex items-center justify-between px-6 pt-12">
+        <div className="flex items-center gap-2">
+          {step !== "role" && (
+            <button
+              onClick={handleBack}
+              className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-muted/50 transition-colors"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+          <Zap className="h-6 w-6 text-primary" />
+          <span className="text-base font-bold tracking-tight">
+            JEE Prep Master
+          </span>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-border hover:bg-muted/50 transition-all shadow-sm"
+          aria-label="Toggle theme"
+        >
+          {currentTheme === "dark" ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-primary" />}
+        </button>
       </div>
 
-      <div className="flex flex-1 flex-col px-6 pt-8">
+      <div className="flex flex-1 flex-col px-6 pt-10">
         {step === "role" && (
-          <div className="animate-fade-in flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-bold text-foreground text-balance">Welcome Back</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                Welcome Friend
+              </h1>
               <p className="text-sm text-muted-foreground">
-                Choose your role to continue
+                Let's get started on your journey today
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <Label className="text-sm font-medium text-foreground">I am a...</Label>
-              <div className="flex gap-3">
+            <div className="flex flex-col gap-4">
+              <Label className="text-sm font-semibold text-foreground/90">
+                I am a...
+              </Label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <button
                   onClick={() => handleRoleSelect("student")}
-                  className="flex flex-1 flex-col items-center gap-3 rounded-2xl border-2 border-border bg-card p-5 transition-all hover:border-primary/50"
+                  className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 transition-all hover:border-primary/50 hover:bg-primary/5 active:scale-95 shadow-sm group"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                    <GraduationCap className="h-6 w-6 text-muted-foreground" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted group-hover:bg-primary/10 transition-colors">
+                    <GraduationCap className="h-7 w-7 text-primary" />
                   </div>
-                  <span className="text-sm font-semibold text-foreground">Student</span>
+                  <span className="text-sm font-bold">Student</span>
                 </button>
 
                 <button
                   onClick={() => handleRoleSelect("teacher")}
-                  className="flex flex-1 flex-col items-center gap-3 rounded-2xl border-2 border-border bg-card p-5 transition-all hover:border-accent/50"
+                  className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 transition-all hover:border-secondary/50 hover:bg-secondary/5 active:scale-95 shadow-sm group"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                    <BookOpen className="h-6 w-6 text-muted-foreground" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted group-hover:bg-secondary/10 transition-colors">
+                    <BookOpen className="h-7 w-7 text-secondary" />
                   </div>
-                  <span className="text-sm font-semibold text-foreground">Teacher</span>
+                  <span className="text-sm font-bold">Teacher</span>
                 </button>
 
                 <button
                   onClick={() => handleRoleSelect("admin")}
-                  className="flex flex-1 flex-col items-center gap-3 rounded-2xl border-2 border-border bg-card p-5 transition-all hover:border-warning/50"
+                  className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 transition-all hover:border-accent/50 hover:bg-accent/5 active:scale-95 shadow-sm group"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                    <Shield className="h-6 w-6 text-muted-foreground" />
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted group-hover:bg-accent/10 transition-colors">
+                    <Shield className="h-7 w-7 text-accent" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Admin</span>
+                  <span className="text-sm font-bold">Admin</span>
                 </button>
               </div>
             </div>
@@ -253,12 +285,14 @@ export function AuthScreen() {
         )}
 
         {step === "login" && selectedRole && (
-          <div className="animate-fade-in flex flex-col gap-6">
+          <div className="animate-fade-in flex flex-col gap-8 max-w-md w-full mx-auto">
             <div className="flex flex-col gap-2">
-              <h1 className="text-2xl font-bold text-foreground text-balance">
+              <h1 className="text-3xl font-bold tracking-tight">
                 {mode === "signup" ? "Create Account" : "Sign In"}
               </h1>
-              <p className="text-sm text-muted-foreground">{roleLabels[selectedRole]}</p>
+              <p className="text-sm text-muted-foreground font-medium">
+                Access as {roleLabels[selectedRole]}
+              </p>
             </div>
 
             <form
@@ -266,19 +300,20 @@ export function AuthScreen() {
                 e.preventDefault();
                 handleLogin();
               }}
-              className="flex flex-col gap-4"
+              className="flex flex-col gap-5"
             >
-              <div className="flex gap-2">
+              <div className="flex p-1 gap-1 rounded-2xl bg-muted/50 border border-border">
                 <button
                   type="button"
                   onClick={() => {
                     setMode("signin");
                     setAuthError(null);
                   }}
-                  className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors ${mode === "signin"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-card text-muted-foreground"
-                    }`}
+                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
+                    mode === "signin" 
+                      ? "bg-card text-foreground shadow-sm" 
+                      : "text-muted-foreground hover:bg-card/50"
+                  }`}
                 >
                   Sign In
                 </button>
@@ -290,22 +325,25 @@ export function AuthScreen() {
                     setAuthError(null);
                   }}
                   disabled={selectedRole === "admin"}
-                  className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${mode === "signup"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-card text-muted-foreground"
-                    }`}
+                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all disabled:opacity-30 ${
+                    mode === "signup" 
+                      ? "bg-card text-foreground shadow-sm" 
+                      : "text-muted-foreground hover:bg-card/50"
+                  }`}
                 >
                   Sign Up
                 </button>
               </div>
 
               {mode === "signin" && (
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-foreground">
-                      Demo {roleLabels[selectedRole]} Accounts
+                <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground/80">
+                      Demo Accounts
                     </span>
-                    <span className="text-[10px] text-muted-foreground">Tap to autofill</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      One-tap access
+                    </span>
                   </div>
                   <div className="flex flex-col gap-2">
                     {demoCredentials[selectedRole].map((entry) => (
@@ -313,114 +351,121 @@ export function AuthScreen() {
                         key={entry.email}
                         type="button"
                         onClick={() => applyDemoCredentials(entry)}
-                        className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-muted/40"
+                        className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-left transition-all hover:bg-primary/5 hover:border-primary/30"
                       >
                         <div className="flex flex-col">
-                          <span className="text-xs font-medium text-foreground">{entry.label}</span>
-                          <span className="text-[11px] text-muted-foreground">{entry.email}</span>
+                          <span className="text-xs font-bold text-foreground">
+                            {entry.label}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {entry.email}
+                          </span>
                         </div>
-                        <span className="text-[11px] font-medium text-primary">Autofill</span>
+                        <Zap className="h-3.5 w-3.5 text-primary" />
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {mode === "signup" && (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="name" className="text-sm font-medium text-foreground">
-                    Full Name
+              <div className="space-y-4">
+                {mode === "signup" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-semibold">
+                      Full Name
+                    </Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      type="text"
+                      autoComplete="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="rounded-xl h-12 bg-card border-border focus:ring-primary"
+                      placeholder="Your full name"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-semibold">
+                    Email Address
                   </Label>
                   <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="rounded-xl border-border bg-card py-5 text-foreground placeholder:text-muted-foreground"
-                    placeholder="Your full name"
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="rounded-xl h-12 bg-card border-border focus:ring-primary"
+                    placeholder="you@example.com"
                   />
                 </div>
-              )}
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-xl border-border bg-card py-5 text-foreground placeholder:text-muted-foreground"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="password" className="text-sm font-medium text-foreground">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="rounded-xl border-border bg-card py-5 text-foreground placeholder:text-muted-foreground"
-                  placeholder="Enter your password"
-                />
-              </div>
-
-              {mode === "signup" && selectedRole === "teacher" && (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="subject" className="text-sm font-medium text-foreground">
-                    Subject
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-semibold">
+                    Password
                   </Label>
-                  <select
-                    id="subject"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value as "Physics" | "Chemistry" | "Mathematics")}
-                    className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-foreground"
-                  >
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Mathematics">Mathematics</option>
-                  </select>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="rounded-xl h-12 bg-card border-border focus:ring-primary"
+                    placeholder="Min 8 characters"
+                  />
                 </div>
-              )}
 
-              {mode === "signup" && selectedRole === "student" && (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="year" className="text-sm font-medium text-foreground">
-                    Class Year
-                  </Label>
-                  <select
-                    id="year"
-                    value={year}
-                    onChange={(e) => setYear(e.target.value as "11th" | "12th")}
-                    className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-foreground"
-                  >
-                    <option value="11th">11th</option>
-                    <option value="12th">12th</option>
-                  </select>
-                </div>
-              )}
+                {mode === "signup" && selectedRole === "teacher" && (
+                   <div className="space-y-2">
+                    <Label htmlFor="subject" className="text-sm font-semibold">
+                      Your Specialization
+                    </Label>
+                    <select
+                      id="subject"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value as "Physics" | "Chemistry" | "Mathematics")}
+                      className="w-full flex h-12 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="Physics">Physics</option>
+                      <option value="Chemistry">Chemistry</option>
+                      <option value="Mathematics">Mathematics</option>
+                    </select>
+                  </div>
+                )}
+
+                {mode === "signup" && selectedRole === "student" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="year" className="text-sm font-semibold">
+                      Class Level
+                    </Label>
+                    <select
+                      id="year"
+                      value={year}
+                      onChange={(e) => setYear(e.target.value as "11th" | "12th")}
+                      className="w-full flex h-12 rounded-xl border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="11th">11th Standard</option>
+                      <option value="12th">12th Standard</option>
+                    </select>
+                  </div>
+                )}
+              </div>
 
               {authError && (
-                <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {authError}
-                </p>
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive font-medium flex items-center gap-2">
+                   <Shield className="h-4 w-4 shrink-0" />
+                   {authError}
+                </div>
               )}
 
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="mt-2 w-full gap-2 rounded-2xl bg-primary py-6 text-base font-semibold text-primary-foreground"
+                className="w-full h-14 rounded-2xl text-base font-bold transition-all shadow-md active:scale-95"
                 size="lg"
               >
                 {isSubmitting
@@ -429,17 +474,17 @@ export function AuthScreen() {
                     : "Signing In..."
                   : mode === "signup"
                     ? "Create Account"
-                    : "Sign In"}
-                <ArrowRight className="h-5 w-5" />
+                    : "Continue"}
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </form>
           </div>
         )}
       </div>
 
-      <p className="px-6 pb-8 text-center text-xs text-muted-foreground">
-        By continuing, you agree to our Terms of Service and Privacy Policy
-      </p>
+      <div className="px-6 pb-10 text-center text-xs text-muted-foreground/60 max-w-xs mx-auto">
+        By continuing, you agree to our <span className="underline">Terms</span> and <span className="underline">Privacy Policy</span>
+      </div>
     </div>
   );
 }

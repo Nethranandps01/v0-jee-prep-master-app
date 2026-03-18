@@ -68,7 +68,7 @@ async def create_paper(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> TeacherPaperResponse:
-    return TeacherPaperResponse(**TeacherService.create_paper(db, current_user, payload))
+    return TeacherPaperResponse(**await TeacherService.create_paper(db, current_user, payload))
 
 
 @router.get("/papers/{paper_id}", response_model=TeacherPaperResponse)
@@ -88,7 +88,7 @@ async def update_paper(
     current_user: dict = Depends(get_current_user),
 ) -> TeacherPaperResponse:
     return TeacherPaperResponse(
-        **TeacherService.update_paper(db, current_user, paper_id, payload)
+        **await TeacherService.update_paper(db, current_user, paper_id, payload)
     )
 
 

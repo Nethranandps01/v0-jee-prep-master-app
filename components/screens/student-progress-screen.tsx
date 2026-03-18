@@ -4,9 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/app-context";
 import {
   ApiError,
-  StudentHomeSummaryResponse,
-  StudentProgressResponse,
-  StudentTestResponse,
   getStudentHomeSummary,
   getStudentProgress,
   listStudentTests,
@@ -22,6 +19,53 @@ import {
   FlaskConical,
   Calculator,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function StudentProgressLoading() {
+  return (
+    <div className="flex flex-col gap-6 px-4 py-6 animate-fade-in">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-bold text-foreground">My Progress</h1>
+        <Skeleton className="h-4 w-64" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="flex flex-col gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="ml-auto h-3 w-16" />
+              </div>
+              <div className="flex items-end gap-1.5">
+                {[1, 2, 3, 4, 5].map((j) => (
+                  <div key={j} className="flex flex-1 flex-col items-center gap-1">
+                    <Skeleton className="h-12 w-full rounded-t-md" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const SUBJECTS = ["Physics", "Chemistry", "Mathematics"] as const;
 
@@ -29,15 +73,11 @@ export function StudentProgressScreen() {
   const { studentYear, authToken, studentProgressData, setStudentProgressData } = useApp();
   const year = studentYear || "12th";
 
-  const [progress, setProgress] = useState<StudentProgressResponse | null>(
-    studentProgressData?.progress || null,
-  );
-  const [summary, setSummary] = useState<StudentHomeSummaryResponse | null>(
-    studentProgressData?.summary || null,
-  );
-  const [tests, setTests] = useState<StudentTestResponse[]>(studentProgressData?.tests || []);
+  // Use data directly from context to avoid desync
+  const progress = studentProgressData?.progress || null;
+  const summary = studentProgressData?.summary || null;
+  const tests = studentProgressData?.tests || [];
 
-  // SWR: Loading is false if we have data
   const [loading, setLoading] = useState(!studentProgressData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -52,8 +92,8 @@ export function StudentProgressScreen() {
         return;
       }
 
-      setLoading(true);
-      if (!studentProgressData) {
+      // If we don't have data OR it's a manual reload, show the skeleton
+      if (!studentProgressData || reloadKey > 0) {
         setLoading(true);
       }
       setError(null);
@@ -66,9 +106,6 @@ export function StudentProgressScreen() {
         ]);
 
         if (!cancelled) {
-          setProgress(progressResponse);
-          setSummary(summaryResponse);
-          setTests(testsResponse);
           setStudentProgressData({
             progress: progressResponse,
             summary: summaryResponse,
@@ -95,18 +132,18 @@ export function StudentProgressScreen() {
     return () => {
       cancelled = true;
     };
-  }, [authToken, reloadKey]);
+  }, [authToken, reloadKey, setStudentProgressData]); // Added setStudentProgressData to deps
 
   const subjectMarks = useMemo(() => {
     return SUBJECTS.map((subject) => {
       const scores = tests
-        .filter((test) => test.subject === subject && typeof test.score === "number")
-        .map((test) => Number(test.score))
+        .filter((test: any) => test.subject === subject && typeof test.score === "number")
+        .map((test: any) => Number(test.score))
         .reverse()
         .slice(-5);
 
       const normalized = scores.length > 0 ? scores : [0, 0, 0, 0, 0];
-      const avg = normalized.reduce((sum, value) => sum + value, 0) / normalized.length;
+      const avg = normalized.reduce((sum: number, value: number) => sum + value, 0) / normalized.length;
 
       return {
         subject,
@@ -125,10 +162,19 @@ export function StudentProgressScreen() {
     Mathematics: Calculator,
   };
 
+  if (loading && !studentProgressData) {
+    return <StudentProgressLoading />;
+  }
+
   return (
     <div className="flex flex-col gap-6 px-4 py-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-foreground">My Progress</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground">My Progress</h1>
+          {loading && (
+             <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           {year} Class - Track your JEE preparation journey
         </p>
@@ -152,7 +198,7 @@ export function StudentProgressScreen() {
             <Award className="h-5 w-5 text-primary" />
           </div>
           <span className="text-2xl font-bold text-foreground">
-            {loading ? "--" : `#${progress?.overall_rank ?? 0}`}
+            #{progress?.overall_rank ?? 0}
           </span>
           <span className="text-[11px] text-muted-foreground">Overall Rank</span>
         </div>
@@ -161,7 +207,7 @@ export function StudentProgressScreen() {
             <Users className="h-5 w-5 text-accent" />
           </div>
           <span className="text-2xl font-bold text-foreground">
-            {loading ? "--" : progress?.total_students ?? 0}
+             {progress?.total_students ?? 0}
           </span>
           <span className="text-[11px] text-muted-foreground">Total Students</span>
         </div>
@@ -169,7 +215,7 @@ export function StudentProgressScreen() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15">
             <Flame className="h-5 w-5 text-warning" />
           </div>
-          <span className="text-2xl font-bold text-foreground">{loading ? "--" : summary?.streak ?? 0}</span>
+          <span className="text-2xl font-bold text-foreground">{summary?.streak ?? 0}</span>
           <span className="text-[11px] text-muted-foreground">Day Streak</span>
         </div>
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4">
@@ -177,7 +223,7 @@ export function StudentProgressScreen() {
             <Target className="h-5 w-5 text-primary" />
           </div>
           <span className="text-2xl font-bold text-foreground">
-            {loading ? "--" : progress?.tests_completed ?? 0}
+            {progress?.tests_completed ?? 0}
           </span>
           <span className="text-[11px] text-muted-foreground">Tests Done</span>
         </div>
@@ -247,7 +293,7 @@ export function StudentProgressScreen() {
               return (
                 <div key={`${point.week}-${index}`} className="flex flex-1 flex-col items-center gap-2">
                   <span className="text-[10px] font-medium text-muted-foreground">{point.rank}</span>
-                  <div className="w-full rounded-t-lg bg-primary/80 transition-all" style={{ height: `${height}%` }} />
+                  <div className="w-full rounded-t-lg bg-primary/80 transition-all" style={{ height: `${Math.max(5, height)}%` }} />
                   <span className="text-[10px] text-muted-foreground">{point.week}</span>
                 </div>
               );

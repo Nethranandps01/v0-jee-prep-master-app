@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
-
+from app.core.cache import get_redis
 
 from app.db.client import create_mongo_client
 from app.db.indexes import ensure_indexes  # Added import
@@ -15,7 +15,14 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Startup: Connect to DB
+        # Startup: Connect to Redis (optional) and DB
+        try:
+            get_redis()
+        except Exception:
+            # Redis is optional; get_redis already logs failures
+            pass
+
+        # Connect to DB
         try:
             client = create_mongo_client(settings.mongodb_uri)
             db = client[settings.mongodb_db]

@@ -63,10 +63,20 @@ async def stream_call_openai(
 
 async def stream_chat_reply(query: str) -> AsyncGenerator[str, None]:
     prompt = (
-        "Role: Expert JEE Tutor. Task: Help student.\n"
-        "Format: Concise bullets/short paragraphs. Max 5 pts.\n"
-        "Focus: Strategy, clarity, traps.\n"
-        f"Query: {query}"
+        "Role: Expert JEE Tutor\n"
+        "Task: Help the student.\n"
+        "Focus: Exam strategy, concept clarity, and common traps.\n"
+        "Length: Concise (max 5 points or short paragraphs).\n"
+        "Output rules (strict):\n"
+        "- Plain text only.\n"
+        "- Do not use markdown formatting.\n"
+        "- Do not use '#' headings or '###'.\n"
+        "- Do not use bullets like '-', '*', or '•'.\n"
+        "- Do not use bold/italics markers like '**' or '_'.\n"
+        "- If you need a list, use '1) ...', '2) ...' numbering.\n"
+        "- Do not mention being an AI model.\n"
+        "\n"
+        f"Student query: {query}"
     )
     async for chunk in stream_call_openai(prompt, temperature=0.3, max_output_tokens=500):
         yield chunk
@@ -88,6 +98,67 @@ QUESTION_PATTERN_HINTS = (
     "mcq",
     "quiz",
 )
+async def async_call_openai(
+    prompt: str,
+    *,
+    temperature: float = 0.4,
+    max_output_tokens: int = 1024,
+    response_mime_type: str | None = None,
+) -> str:
+    settings = get_settings()
+    api_key = (settings.openai_api_key or "").strip()
+    if not api_key:
+        raise RuntimeError("AI API key is not configured")
+
+    configured_model = settings.openai_model.strip()
+    model_candidates: list[str] = [configured_model] if configured_model else list(DEFAULT_OPENAI_MODELS)
+    
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+
+    last_error = None
+    for model in model_candidates:
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are an expert JEE tutor and question setter."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_output_tokens,
+        }
+        if response_mime_type == "application/json":
+            body["response_format"] = {"type": "json_object"}
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=30.0)) as client:
+                response = await client.post(url, json=body, headers=headers)
+                if response.status_code != 200:
+                    detail = response.text
+                    # Check for rate limit or model mismatch
+                    if response.status_code == 404:
+                         last_error = RuntimeError(f"Model {model} not found: {detail}")
+                         continue
+                    raise RuntimeError(f"AI provider HTTP {response.status_code}: {detail}")
+                
+                payload = response.json()
+                text = _extract_text(payload)
+                if not text:
+                    continue
+                return text
+        except httpx.RequestError as exc:
+            last_error = RuntimeError(f"Connection error to AI provider: {exc}")
+            continue
+        except Exception as exc: # noqa: BLE001
+            last_error = exc
+            continue
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("AI provider request failed")
 
 
 def call_openai(
@@ -205,6 +276,8 @@ def generate_chat_reply(query: str) -> str:
             "- Use clear, student-friendly language.\n"
             "- Keep each question exam-style and specific.\n"
             "- Do not add long derivations.\n"
+            "- Plain text only. Do not use markdown formatting (no '#', '###', '-', '*', '•', '**', or '_').\n"
+            "- If you need a list, use '1) ...', '2) ...' numbering.\n"
             "- Keep response complete and self-contained. Do not end mid-sentence.\n"
             "- Do not mention being an AI model.\n\n"
             f"Student query: {query}"
@@ -219,9 +292,11 @@ def generate_chat_reply(query: str) -> str:
     prompt = (
         "You are an expert JEE tutor. Give clear, practical help for the student query.\n"
         "Rules:\n"
-        "- Keep response concise (3-8 bullet points or short paragraphs).\n"
+        "- Keep response concise (3-8 points or short paragraphs).\n"
         "- Prioritize exam strategy, concept clarity, and common mistakes.\n"
         "- If relevant, include a short step-by-step method.\n"
+        "- Plain text only. Do not use markdown formatting (no '#', '###', '-', '*', '•', '**', or '_').\n"
+        "- If you need a list, use '1) ...', '2) ...' numbering.\n"
         "- Keep response complete and self-contained. Do not end mid-sentence.\n"
         "- Do not mention being an AI model.\n\n"
         f"Student query: {query}"
