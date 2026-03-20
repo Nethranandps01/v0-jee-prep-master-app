@@ -252,7 +252,7 @@ export function StudentProgressScreen() {
                   <span className="ml-auto text-xs font-bold text-primary">{subject.avg.toFixed(1)}% avg</span>
                 </div>
                 <div className="flex items-end gap-1.5">
-                  {subject.scores.map((score, index) => (
+                  {subject.scores.map((score: number, index: number) => (
                     <div key={index} className="flex flex-1 flex-col items-center gap-1">
                       <div className="w-full rounded-t-md bg-muted" style={{ height: "60px" }}>
                         <div
@@ -287,8 +287,8 @@ export function StudentProgressScreen() {
           {rankHistory.length === 0 ? (
             <div className="w-full text-center text-xs text-muted-foreground">No history available</div>
           ) : (
-            rankHistory.map((point, index) => {
-              const maxRank = Math.max(...rankHistory.map((item) => item.rank));
+            rankHistory.map((point: import('@/lib/api-client').RankPoint, index: number) => {
+              const maxRank = Math.max(...rankHistory.map((item: import('@/lib/api-client').RankPoint) => item.rank));
               const height = ((maxRank - point.rank) / Math.max(maxRank, 1)) * 100 + 20;
               return (
                 <div key={`${point.week}-${index}`} className="flex flex-1 flex-col items-center gap-2">
@@ -310,8 +310,8 @@ export function StudentProgressScreen() {
         <div className="flex flex-col gap-3">
           {(topicMastery.length === 0
             ? [{ topic: "General", mastery: 0 }]
-            : topicMastery.map((item) => ({ topic: item.topic, mastery: item.mastery }))
-          ).map((topic) => (
+            : topicMastery.map((item: import('@/lib/api-client').TopicMastery) => ({ topic: item.topic, mastery: item.mastery }))
+          ).map((topic: { topic: string; mastery: number }) => (
             <div key={topic.topic} className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-foreground">{topic.topic}</span>
