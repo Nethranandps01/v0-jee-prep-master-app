@@ -107,7 +107,7 @@ async def save_answers(
     db: Database = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
-    return StudentService.save_answers(db, current_user, attempt_id, payload.answers)
+    return StudentService.save_answers(db, current_user, attempt_id, payload)
 
 
 @router.post("/attempts/{attempt_id}/submit", response_model=SubmitAttemptResponse)

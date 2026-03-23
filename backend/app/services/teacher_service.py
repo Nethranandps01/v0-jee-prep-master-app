@@ -89,6 +89,7 @@ class TeacherService:
     async def create_paper(db: Database, teacher: dict, payload: TeacherPaperCreateRequest) -> dict:
         now = datetime.now(timezone.utc)
         question_set, question_source = await build_question_set_with_source(
+            db,
             payload.subject,
             payload.questions,
             payload.difficulty,
@@ -165,6 +166,7 @@ class TeacherService:
             difficulty = str(updates.get("difficulty", existing.get("difficulty", "Medium")))
             subject = str(existing.get("subject", "Physics"))
             question_set, question_source = await build_question_set_with_source(
+                db,
                 subject,
                 question_count,
                 difficulty,

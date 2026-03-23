@@ -225,6 +225,7 @@ class PlannerService:
         
         # Generate 5 questions (try AI, fallback to template)
         questions, source = await build_question_set_with_source(
+            db,
             subject=subject,
             total_questions=5,
             difficulty="Medium",

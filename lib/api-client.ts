@@ -302,6 +302,10 @@ export interface SubmitAttemptResponse {
   correct_answers: number;
   incorrect_answers: number;
   unattempted: number;
+  accuracy: number;
+  partial_correct: number;
+  raw_score: number;
+  max_score: number;
 }
 
 export interface ResultResponse {
@@ -314,6 +318,10 @@ export interface ResultResponse {
   correct_answers: number;
   incorrect_answers: number;
   unattempted: number;
+  partial_correct?: number;
+  raw_score?: number;
+  max_score?: number;
+  accuracy?: number;
   submitted_at: string;
   questions: ResultQuestionResponse[];
 }

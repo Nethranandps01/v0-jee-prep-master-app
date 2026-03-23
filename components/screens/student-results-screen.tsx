@@ -198,10 +198,10 @@ export function StudentResultsScreen() {
           className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"
           aria-label="Go back"
         >
-          <ArrowLeft className="h-5 w-5" />
+          {/* <ArrowLeft className="h-5 w-5" /> */}
         </button>
-        <h1 className="text-xl font-bold text-foreground">Test Results</h1>
-        <button
+        <h1 className="text-xl -ml-10 font-bold text-foreground">Test Results</h1>
+        {/* <button
           onClick={() => {
             void handleShare();
           }}
@@ -209,7 +209,7 @@ export function StudentResultsScreen() {
           aria-label="Share results"
         >
           <Share2 className="h-5 w-5" />
-        </button>
+        </button> */}
       </div>
 
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-card p-6">
@@ -228,7 +228,14 @@ export function StudentResultsScreen() {
             />
           </svg>
           <div className="absolute flex flex-col items-center">
-            <span className="text-3xl font-bold text-foreground">{result.score}%</span>
+            {result.raw_score !== undefined ? (
+              <>
+                <span className="text-2xl font-bold text-foreground">{result.raw_score}</span>
+                <span className="text-[10px] text-muted-foreground">OUT OF {result.max_score}</span>
+              </>
+            ) : (
+              <span className="text-3xl font-bold text-foreground">{result.score}%</span>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-center gap-1">
@@ -240,18 +247,30 @@ export function StudentResultsScreen() {
             Subject: {result.subject} • Attempted: {result.answered}/{result.total_questions}
           </span>
         </div>
-        <div className="flex w-full gap-3 pt-2">
-          <div className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-accent/10 p-3">
+        <div className="flex w-full gap-2 pt-2 overflow-x-auto pb-1">
+          <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-primary/10 p-3">
+             <Trophy className="h-5 w-5 text-primary" />
+             <span className="text-lg font-bold text-foreground">{result.raw_score ?? result.score}</span>
+             <span className="text-[10px] text-muted-foreground">Marks</span>
+          </div>
+          <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-accent/10 p-3">
             <CheckCircle2 className="h-5 w-5 text-accent" />
             <span className="text-lg font-bold text-foreground">{result.correct_answers}</span>
             <span className="text-[10px] text-muted-foreground">Correct</span>
           </div>
-          <div className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-destructive/10 p-3">
+          {result.partial_correct ? (
+            <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-warning/10 p-3">
+              <CheckCircle2 className="h-5 w-5 text-warning opacity-70" />
+              <span className="text-lg font-bold text-foreground">{result.partial_correct}</span>
+              <span className="text-[10px] text-muted-foreground">Partial</span>
+            </div>
+          ) : null}
+          <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-destructive/10 p-3">
             <XCircle className="h-5 w-5 text-destructive" />
             <span className="text-lg font-bold text-foreground">{result.incorrect_answers}</span>
-            <span className="text-[10px] text-muted-foreground">Incorrect</span>
+            <span className="text-[10px] text-muted-foreground">Wrong</span>
           </div>
-          <div className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-muted p-3">
+          <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-muted p-3">
             <MinusCircle className="h-5 w-5 text-muted-foreground" />
             <span className="text-lg font-bold text-foreground">{result.unattempted}</span>
             <span className="text-[10px] text-muted-foreground">Skipped</span>
@@ -420,23 +439,25 @@ function ResultQuestionCard({
   onToggle: () => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+    <div className={`overflow-hidden rounded-2xl border transition-all duration-300 ${
+      expanded ? "border-primary/20 shadow-md" : "border-border"
+    } bg-card`}>
       <button onClick={onToggle} className="flex w-full items-center gap-3 p-4 text-left">
         <div
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
             question.is_correct
-              ? "bg-accent/15"
+              ? "bg-emerald-500/10 text-emerald-600"
               : question.selected_answer === null
-                ? "bg-muted"
-                : "bg-destructive/15"
+                ? "bg-muted text-muted-foreground"
+                : "bg-rose-500/10 text-rose-600"
           }`}
         >
           {question.is_correct ? (
-            <CheckCircle2 className="h-4 w-4 text-accent" />
+            <CheckCircle2 className="h-5 w-5" />
           ) : question.selected_answer === null ? (
-            <MinusCircle className="h-4 w-4 text-muted-foreground" />
+            <MinusCircle className="h-5 w-5" />
           ) : (
-            <XCircle className="h-4 w-4 text-destructive" />
+            <XCircle className="h-5 w-5" />
           )}
         </div>
         <div className="flex flex-1 flex-col gap-0.5">
@@ -464,7 +485,7 @@ function ResultQuestionCard({
                 <span className="text-[11px] font-medium text-muted-foreground">Your Answer:</span>
                 <span
                   className={`text-[11px] font-semibold ${
-                    question.is_correct ? "text-accent" : "text-destructive"
+                    question.is_correct ? "text-emerald-600" : "text-rose-600"
                   }`}
                 >
                   {optionLabel(question.selected_answer, question.options)}
@@ -473,7 +494,7 @@ function ResultQuestionCard({
               {!question.is_correct && (
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-medium text-muted-foreground">Correct Answer:</span>
-                  <span className="text-[11px] font-semibold text-accent">
+                  <span className="text-[11px] font-semibold text-emerald-600">
                     {optionLabel(question.correct_answer, question.options)}
                   </span>
                 </div>

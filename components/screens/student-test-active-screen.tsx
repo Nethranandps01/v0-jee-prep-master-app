@@ -17,6 +17,7 @@ import {
   Flag,
   AlertTriangle,
   CheckCircle2,
+  Trophy,
 } from "lucide-react";
 
 function formatTime(seconds: number): string {
@@ -50,7 +51,10 @@ export function StudentTestActiveScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [showResultPopup, setShowResultPopup] = useState(false);
+  const [resultData, setResultData] = useState<{ score: number; raw_score?: number; max_score?: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasAgreed, setHasAgreed] = useState(false);
   const autoSubmitTriggeredRef = useRef(false);
 
   const buildAnswerPayload = useCallback(
@@ -65,6 +69,7 @@ export function StudentTestActiveScreen() {
   );
 
   useEffect(() => {
+    if (!hasAgreed) return;
     let cancelled = false;
 
     const initAttempt = async () => {
@@ -141,6 +146,7 @@ export function StudentTestActiveScreen() {
     setAttemptAnswers,
     setAttemptQuestions,
     setCompletedTestId,
+    hasAgreed,
   ]);
 
   useEffect(() => {
@@ -223,7 +229,13 @@ export function StudentTestActiveScreen() {
         });
         setCompletedTestId(submitted.attempt_id);
         setAttemptAnswers(answers);
-        navigate("student-results");
+        setResultData({
+          score: submitted.score,
+          raw_score: submitted.raw_score,
+          max_score: submitted.max_score,
+        });
+        setShowResultPopup(true);
+        // We stay on this screen to show the popup. Navigation happens via popup button.
       } catch (err) {
         if (err instanceof ApiError) {
           setActionError(err.detail);
@@ -318,6 +330,93 @@ export function StudentTestActiveScreen() {
   const flaggedCount = useMemo(() => flagged.filter(Boolean).length, [flagged]);
   const question = questions[currentQ];
 
+  if (!hasAgreed) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background px-6 py-8 pb-[env(safe-area-inset-bottom)] pt-[calc(2rem+env(safe-area-inset-top))]">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-xl font-bold text-foreground">Exam Instructions</h1>
+            <p className="text-xs text-muted-foreground">Please review the rules before beginning.</p>
+          </div>
+
+          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+            <div className="flex flex-col gap-3">
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-widest opacity-70">Exam Rules</h3>
+              <ul className="flex flex-col gap-2.5">
+                {[
+                  "Ensure a stable internet connection.",
+                  "Timer starts immediately after proceeding.",
+                  "Do NOT switch tabs (Proctored mode).",
+                  "Right-click and screenshots are disabled.",
+                  "Answers are automatically saved."
+                ].map((rule, idx) => (
+                  <li key={idx} className="flex gap-2.5 text-[11px] leading-snug text-muted-foreground">
+                    <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
+                      {idx + 1}
+                    </div>
+                    <span>{rule}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-widest opacity-70">Marking</h3>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <table className="w-full text-[9px] text-left">
+                  <thead className="bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-2.5 py-1.5 font-bold">Type</th>
+                      <th className="px-1.5 py-1.5 font-bold text-center">Correct</th>
+                      <th className="px-1.5 py-1.5 font-bold text-center">Wrong</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {[
+                      { type: "MCQ (Main)", c: "+4", w: "-1" },
+                      { type: "Numerical", c: "+4", w: "0" },
+                      { type: "Adv Single", c: "+3", w: "-1" },
+                      { type: "Adv Multiple", c: "+4/P", w: "-2" },
+                    ].map((row, i) => (
+                      <tr key={i}>
+                        <td className="px-2.5 py-1.5 font-medium">{row.type}</td>
+                        <td className="px-1.5 py-1.5 text-center text-primary font-bold">{row.c}</td>
+                        <td className="px-1.5 py-1.5 text-center text-destructive font-bold">{row.w}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5 rounded-lg bg-orange-500/5 p-3 border border-orange-500/10">
+              <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                Violations will result in automatic submission. 
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              onClick={() => setHasAgreed(true)}
+              className="rounded-xl h-12 bg-primary text-primary-foreground text-sm font-bold active:scale-[0.98]"
+            >
+              Start Exam
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate("student-tests")}
+              className="h-10 text-xs text-muted-foreground"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-6">
@@ -355,6 +454,53 @@ export function StudentTestActiveScreen() {
           >
             Back to Tests
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showResultPopup && resultData) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background/60 px-6 backdrop-blur-sm">
+        <div className="flex w-full max-w-[280px] flex-col items-center gap-4 rounded-[2rem] border border-primary/10 bg-card p-6 shadow-xl animate-in zoom-in-95 duration-300">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Trophy className="h-6 w-6 text-primary" />
+          </div>
+          
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h2 className="text-lg font-bold text-foreground opacity-80">Test Result</h2>
+            <div className="flex flex-col items-center mt-1">
+              <span className="text-4xl font-black text-primary tracking-tighter">
+                {resultData.raw_score ?? resultData.score}
+              </span>
+              <div className="flex flex-col opacity-60">
+                <span className="text-[9px] font-bold uppercase tracking-[0.15em]">
+                  Marks Obtained
+                </span>
+                {resultData.max_score && (
+                  <span className="text-[9px] font-medium italic">
+                    Out of {resultData.max_score}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex w-full flex-col gap-2 mt-2">
+            <Button
+              onClick={() => navigate("student-results")}
+              className="w-full rounded-xl bg-primary h-11 text-xs font-bold shadow-md shadow-primary/20 active:scale-[0.98]"
+            >
+              Analyze Results
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("student-home")}
+              className="w-full rounded-xl h-10 text-[10px] font-semibold border-muted-foreground/10 text-muted-foreground"
+            >
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );

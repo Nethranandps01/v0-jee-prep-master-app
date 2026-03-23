@@ -56,3 +56,19 @@ def cache_set(key: str, value: Any, ttl: timedelta) -> None:
         payload = json.dumps(str(value))
     client.setex(key, int(ttl.total_seconds()), payload)
 
+
+def cache_delete(key: str) -> None:
+    client = get_redis()
+    if not client:
+        return
+    client.delete(key)
+
+
+def cache_delete_pattern(pattern: str) -> None:
+    """Delete all keys matching a pattern (e.g. prefix:*)"""
+    client = get_redis()
+    if not client:
+        return
+    keys = client.keys(pattern)
+    if keys:
+        client.delete(*keys)

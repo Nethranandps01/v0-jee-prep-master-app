@@ -5,7 +5,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 from pymongo.database import Database
 
-from app.core.cache import cache_get, cache_set
+from app.core.cache import cache_get, cache_set, cache_delete_pattern
 from app.core.config import get_settings
 from app.schemas.student import FeedbackRequest, SaveAnswersRequest
 from app.services.activity_service import ActivityService
@@ -14,10 +14,30 @@ from app.services.notification_service import NotificationService
 from app.services.planner_service import PlannerService
 from app.services.public_resource import PublicResourceService
 from app.services.question_bank import build_question_set
+from app.services.scoring_service import ScoringService
 from app.utils.mongo import parse_object_id, serialize_id
+
+# JEE Marking Configuration
+JEE_MAIN_RULES = {
+    "MCQ": {
+        "correct": 4,
+        "wrong": -1,
+        "unattempted": 0
+    },
+    "NUMERICAL": {
+        "correct": 4,
+        "wrong": 0,
+        "unattempted": 0
+    }
+}
 
 
 class StudentService:
+    @staticmethod
+    def _invalidate_cache(student_id: str) -> None:
+        """Clear all student-related caches (dashboard, home, tests, progress)"""
+        cache_delete_pattern(f"student:*:{student_id}:*")
+
 
     @staticmethod
     def dashboard_summary(db: Database, student: dict) -> dict:
@@ -26,7 +46,7 @@ class StudentService:
         Returns small, already-shaped payloads used on the home screen.
         """
         student_id = str(student["_id"])
-        cache_key = f"student:dashboard:{student_id}:v1"
+        cache_key = f"student:dashboard:{student_id}:v2"
 
         if cached := cache_get(cache_key):
             return cached
@@ -49,248 +69,11 @@ class StudentService:
         cache_set(cache_key, payload, ttl=timedelta(minutes=3))
         return payload
 
-    # 🚀 HOME SUMMARY (OPTIMIZED)
+
     @staticmethod
     def home_summary(db: Database, student: dict) -> dict:
         student_id = str(student["_id"])
         cache_key = f"student:home:{student_id}:v2"
-
-        if cached := cache_get(cache_key):
-            return cached
-
-        year = student.get("year")
-
-        # 🔥 SINGLE aggregation instead of multiple queries
-        pipeline = [
-            {"$match": {"student_id": student_id, "status": "submitted"}},
-            {
-                "$group": {
-                    "_id": None,
-                    "completed_tests": {"$sum": 1},
-                    "avg_score": {"$avg": "$score"},
-                    "last_dates": {"$push": "$submitted_at"},
-                }
-            }
-        ]
-
-        stats = list(db.test_attempts.aggregate(pipeline))
-        completed_tests = stats[0]["completed_tests"] if stats else 0
-        avg_score = round(float(stats[0]["avg_score"]), 1) if stats else 0.0
-
-        # 🚀 Assigned tests (optimized)
-        assigned_tests_count = db.tests.count_documents({
-            "status": {"$in": ["assigned", "active"]},
-            "year": year
-        })
-
-        # 🚀 Streak optimized
-        streak = 0
-        if stats and stats[0].get("last_dates"):
-            dates = sorted(
-                {d.date() for d in stats[0]["last_dates"] if d},
-                reverse=True
-            )
-
-            if dates:
-                today = datetime.now(timezone.utc).date()
-                if (today - dates[0]).days <= 1:
-                    streak = 1
-                    for i in range(len(dates) - 1):
-                        if (dates[i] - dates[i+1]).days == 1:
-                            streak += 1
-                        else:
-                            break
-
-        result = {
-            "assigned_tests": assigned_tests_count,
-            "completed_tests": completed_tests,
-            "avg_score": avg_score,
-            "streak": streak,
-        }
-
-        # Cache for 3 minutes – fast enough to feel live, long enough to absorb bursts.
-        cache_set(cache_key, result, ttl=timedelta(minutes=3))
-        return result
-
-
-    # 🚀 LIST TESTS (MAJOR OPTIMIZATION)
-    @staticmethod
-    def list_tests(db: Database, student: dict, status_filter=None, subject=None):
-        student_id = str(student["_id"])
-        cache_key = f"student:tests:{student_id}:{status_filter}:{subject}:v2"
-
-        if cached := cache_get(cache_key):
-            return cached
-
-        query = {
-            "status": {"$in": ["assigned", "active"]},
-            "year": student.get("year")
-        }
-
-        if subject:
-            query["subject"] = subject
-
-        # 🔥 SINGLE pipeline (no multiple queries)
-        pipeline = [
-            {"$match": query},
-            {"$sort": {"created_at": -1}},
-            {
-                "$lookup": {
-                    "from": "test_attempts",
-                    "let": {"test_id": {"$toString": "$_id"}},
-                    "pipeline": [
-                        {
-                            "$match": {
-                                "$expr": {
-                                    "$and": [
-                                        {"$eq": ["$test_id", "$$test_id"]},
-                                        {"$eq": ["$student_id", student_id]},
-                                        {"$eq": ["$status", "submitted"]}
-                                    ]
-                                }
-                            }
-                        },
-                        {"$project": {"score": 1}},
-                        {"$limit": 1}
-                    ],
-                    "as": "attempt"
-                }
-            },
-            {
-                "$project": {
-                    "title": 1,
-                    "subject": 1,
-                    "created_at": 1,
-                    "score": {"$arrayElemAt": ["$attempt.score", 0]}
-                }
-            }
-        ]
-
-        tests = list(db.tests.aggregate(pipeline))
-
-        responses = []
-        for t in tests:
-            payload = serialize_id(t)
-
-            payload["status"] = "completed" if payload.get("score") else "assigned"
-
-            if status_filter and payload["status"] != status_filter:
-                continue
-
-            responses.append(payload)
-
-        # Shorter cache for tests to reflect new assignments reasonably quickly.
-        cache_set(cache_key, responses, ttl=timedelta(minutes=2))
-        return responses
-
-
-    # 🚀 SAVE ANSWERS (MINOR OPTIMIZATION)
-    @staticmethod
-    def save_answers(db: Database, student: dict, attempt_id: str, payload):
-        student_id = str(student["_id"])
-        attempt_oid = parse_object_id(attempt_id, "attempt_id")
-
-        attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
-        if not attempt:
-            raise HTTPException(404, "Attempt not found")
-
-        if attempt["status"] != "in_progress":
-            raise HTTPException(409, "Already submitted")
-
-        # 🔥 Direct merge (faster)
-        db.test_attempts.update_one(
-            {"_id": attempt_oid},
-            {
-                "$set": {
-                    "answers": payload.answers,
-                    "updated_at": datetime.now(timezone.utc)
-                }
-            }
-        )
-
-        return {"attempt_id": attempt_id}
-
-
-    # 🚀 SUBMIT ATTEMPT (OPTIMIZED LOGIC)
-    @staticmethod
-    def submit_attempt(db: Database, student: dict, attempt_id: str):
-        student_id = str(student["_id"])
-        attempt_oid = parse_object_id(attempt_id, "attempt_id")
-
-        attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
-        if not attempt:
-            raise HTTPException(404, "Attempt not found")
-
-        if attempt["status"] == "submitted":
-            raise HTTPException(409, "Already submitted")
-
-        answers = attempt.get("answers", {})
-        question_set = attempt.get("question_set", [])
-
-        correct = 0
-        answered = 0
-
-        for q in question_set:
-            qid = str(q["id"])
-            if qid in answers:
-                answered += 1
-                if answers[qid] == q["correct"]:
-                    correct += 1
-
-        total = len(question_set)
-        score = round((correct / total) * 100, 1) if total else 0
-
-        db.test_attempts.update_one(
-            {"_id": attempt_oid},
-            {"$set": {
-                "status": "submitted",
-                "score": score,
-                "correct_answers": correct,
-                "incorrect_answers": answered - correct,
-                "unattempted": total - answered,
-                "submitted_at": datetime.now(timezone.utc),
-            }}
-        )
-
-        return {"score": score}
-
-
-    # 🚀 PROGRESS (OPTIMIZED)
-    @staticmethod
-    def progress(db: Database, student: dict):
-        student_id = str(student["_id"])
-        cache_key = f"student:progress:{student_id}:v2"
-
-        if cached := cache_get(cache_key):
-            return cached
-
-        pipeline = [
-            {"$match": {"student_id": student_id, "status": "submitted"}},
-            {
-                "$group": {
-                    "_id": "$subject",
-                    "avg": {"$avg": "$score"},
-                    "count": {"$sum": 1}
-                }
-            }
-        ]
-
-        results = list(db.test_attempts.aggregate(pipeline))
-
-        total = sum(r["count"] for r in results)
-        avg = round(sum(r["avg"] * r["count"] for r in results) / total, 1) if total else 0
-
-        response = {
-            "avg_score": avg,
-            "topic_mastery": results
-        }
-
-        cache_set(cache_key, response, ttl=timedelta(minutes=5))
-        return response
-    @staticmethod
-    def home_summary(db: Database, student: dict) -> dict:
-        student_id = str(student["_id"])
-        cache_key = f"student:home:{student_id}:v1"
         cached = cache_get(cache_key)
         if cached:
             return cached
@@ -310,8 +93,8 @@ class StudentService:
             },
         ]
         stats = list(db.test_attempts.aggregate(stats_pipeline))
-        completed_tests = stats[0]["completed_tests"] if stats else 0
-        avg_score = round(float(stats[0]["avg_score"]), 1) if stats else 0.0
+        completed_tests = stats[0].get("completed_tests", 0) if stats else 0
+        avg_score = round(float(stats[0].get("avg_score", 0.0) or 0.0), 1) if stats else 0.0
 
         # 2. Assigned tests (optimized query)
         access_clauses = []
@@ -365,7 +148,7 @@ class StudentService:
         subject: str | None,
     ) -> list[dict]:
         student_id = str(student["_id"])
-        cache_key = f"student:tests:{student_id}:{status_filter or 'all'}:{subject or 'all'}:v1"
+        cache_key = f"student:tests:{student_id}:{status_filter or 'all'}:{subject or 'all'}:v2"
         cached = cache_get(cache_key)
         if cached:
             return cached
@@ -508,6 +291,7 @@ class StudentService:
         if not question_set:
             try:
                 question_set = await build_question_set(
+                    db,
                     str(test.get("subject", "Physics")),
                     total_questions,
                     str(test.get("difficulty", "Medium")),
@@ -684,23 +468,49 @@ class StudentService:
             total_questions = len(question_set)
 
         if question_set:
-            correct_answers = 0
-            answered = 0
-            question_map = {
-                str(question.get("id")): int(question.get("correct", -1))
-                for question in question_set
+            scoring_res = ScoringService.calculate_jee_score(question_set, answers)
+            
+            total_jee_score = scoring_res["score"]
+            correct_count = scoring_res["stats"]["correct"]
+            wrong_count = scoring_res["stats"]["wrong"]
+            unattempted_count = scoring_res["stats"]["unattempted"]
+            partial_count = scoring_res["stats"]["partial"]
+            accuracy = scoring_res["accuracy"]
+            
+            # Determine max score based on question types (Main = 4, Adv Single = 3, Adv Multi = 4)
+            from app.services.scoring_service import JEE_RULES
+            max_possible = 0
+            for q in question_set:
+                qtype = q.get("type", "MCQ_MAIN")
+                if qtype == "ADV_SINGLE":
+                    max_possible += 3
+                else:
+                    max_possible += 4 # Default for MCQ_MAIN, NUMERICAL_MAIN, ADV_MULTIPLE
+            
+            score_percent = round((total_jee_score / max_possible * 100), 1) if max_possible > 0 else 0.0
+            
+            # AI Analysis (Bonus Step 7)
+            # Find subjects of wrong/unattempted questions for analysis
+            weak_topics = set()
+            for q in question_set:
+                qid = str(q.get("id"))
+                if answers.get(qid) is None or ScoringService._is_wrong(q, answers.get(qid)):
+                    if q.get("subject"):
+                        weak_topics.add(q.get("subject"))
+            
+            analysis = {
+                "weak_areas": list(weak_topics),
+                "message": "Focus more on " + ", ".join(list(weak_topics)[:2]) + " to improve your rank." if weak_topics else "Excellent performance! Keep it up.",
+                "total_score": total_jee_score,
+                "max_score": max_possible,
+                "partial_correct": partial_count,
             }
-            for question_id, correct_option in question_map.items():
-                selected = StudentService._normalize_answer(answers.get(question_id))
-                if selected is None:
-                    continue
-                answered += 1
-                if selected == correct_option:
-                    correct_answers += 1
-
-            incorrect_answers = answered - correct_answers
-            unattempted = max(total_questions - answered, 0)
-            score = round((correct_answers / total_questions) * 100, 1) if total_questions else 0.0
+            
+            correct_answers = correct_count
+            incorrect_answers = wrong_count
+            unattempted = unattempted_count
+            answered = correct_answers + incorrect_answers + partial_count
+            score = score_percent
         else:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -714,9 +524,14 @@ class StudentService:
                 "$set": {
                     "status": "submitted",
                     "score": score,
+                    "raw_score": total_jee_score,
+                    "max_score": total_questions * 4,
                     "correct_answers": correct_answers,
                     "incorrect_answers": incorrect_answers,
                     "unattempted": unattempted,
+                    "partial_correct": partial_count,
+                    "total_answered": answered,
+                    "analysis": analysis,
                     "auto_submitted": auto_submitted,
                     "violation_reason": cleaned_violation_reason,
                     "submitted_at": submitted_at,
@@ -766,6 +581,8 @@ class StudentService:
                 ),
                 notification_type="test",
             )
+        # Invalidate student cache so dashboard reflects the submission
+        StudentService._invalidate_cache(student_id)
 
         return {
             "attempt_id": attempt_id,
@@ -775,6 +592,10 @@ class StudentService:
             "correct_answers": correct_answers,
             "incorrect_answers": incorrect_answers,
             "unattempted": unattempted,
+            "accuracy": accuracy,
+            "partial_correct": partial_count,
+            "raw_score": total_jee_score,
+            "max_score": max_possible
         }
 
     @staticmethod
@@ -817,10 +638,14 @@ class StudentService:
             "subject": attempt.get("subject", "General"),
             "score": float(attempt.get("score", 0.0)),
             "total_questions": int(attempt.get("total_questions", len(question_set))),
-            "answered": int(attempt.get("correct_answers", 0) + attempt.get("incorrect_answers", 0)),
+            "answered": int(attempt.get("total_answered") or (attempt.get("correct_answers", 0) + attempt.get("incorrect_answers", 0))),
             "correct_answers": int(attempt.get("correct_answers", 0)),
             "incorrect_answers": int(attempt.get("incorrect_answers", 0)),
             "unattempted": int(attempt.get("unattempted", 0)),
+            "partial_correct": int(attempt.get("partial_correct") or 0),
+            "raw_score": float(attempt.get("raw_score") or 0.0),
+            "max_score": float(attempt.get("max_score") or 0.0),
+            "accuracy": float(attempt.get("accuracy") or 0.0),
             "submitted_at": attempt.get("submitted_at", datetime.now(timezone.utc)),
             "questions": questions,
         }
@@ -829,7 +654,7 @@ class StudentService:
     @staticmethod
     def progress(db: Database, student: dict) -> dict:
         student_id = str(student["_id"])
-        cache_key = f"student:progress:{student_id}:v1"
+        cache_key = f"student:progress:{student_id}:v2"
         cached = cache_get(cache_key)
         if cached:
             return cached
@@ -839,11 +664,11 @@ class StudentService:
             {"$match": {"student_id": student_id, "status": "submitted"}},
             {"$group": {"_id": "$subject", "avg": {"$avg": "$score"}, "count": {"$sum": 1}}}
         ]))
-        topic_mastery = [{"topic": r["_id"] or "General", "mastery": round(float(r["avg"]), 1)} for r in mastery_results]
+        topic_mastery = [{"topic": r["_id"] or "General", "mastery": round(float(r.get("avg", 0.0) or 0.0), 1)} for r in mastery_results]
         if not topic_mastery: topic_mastery = [{"topic": "General", "mastery": 0.0}]
 
-        total_completed = sum(r["count"] for r in mastery_results)
-        overall_avg = round(sum(r["avg"] * r["count"] for r in mastery_results) / total_completed, 1) if total_completed else 0.0
+        total_completed = sum(r.get("count", 0) for r in mastery_results)
+        overall_avg = round(sum((r.get("avg", 0.0) or 0.0) * r.get("count", 0) for r in mastery_results) / total_completed, 1) if total_completed else 0.0
 
         # 2. Overall Rank (Optimized - Count higher scores)
         # Calculate my average score first
@@ -851,7 +676,7 @@ class StudentService:
             {"$match": {"student_id": student_id, "status": "submitted", "submitted_at": {"$ne": None}}},
             {"$group": {"_id": None, "score": {"$avg": "$score"}}}
         ]))
-        my_avg = float(my_avg_result[0]["score"]) if my_avg_result else 0.0
+        my_avg = float(my_avg_result[0].get("score", 0.0) or 0.0) if my_avg_result else 0.0
         
         # Count students with higher average score
         # Note regarding performance: Ideally this should be a pre-calculated status on the User model
@@ -887,8 +712,8 @@ class StudentService:
         
         for att in reversed(last_attempts):
             rank_history.append({
-                "week": att["submitted_at"].strftime("%b %d"), 
-                "rank": att["score"] # Using score as the y-axis metric for now as it's more useful
+                "week": (att.get("submitted_at") or datetime.now(timezone.utc)).strftime("%b %d"), 
+                "rank": int(round(float(att.get("score", 0.0) or 0.0)))
             })
 
         if not rank_history: rank_history = [{"week": "Now", "rank": 0}]

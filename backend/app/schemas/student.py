@@ -59,6 +59,10 @@ class SubmitAttemptResponse(BaseModel):
     correct_answers: int
     incorrect_answers: int
     unattempted: int
+    accuracy: float | None = None
+    partial_correct: int | None = None
+    raw_score: float | None = None
+    max_score: float | None = None
 
 
 class ResultQuestionResponse(BaseModel):
@@ -82,6 +86,10 @@ class ResultResponse(BaseModel):
     correct_answers: int
     incorrect_answers: int
     unattempted: int
+    partial_correct: int | None = None
+    raw_score: float | None = None
+    max_score: float | None = None
+    accuracy: float | None = None
     submitted_at: datetime
     questions: list[ResultQuestionResponse] = Field(default_factory=list)
 
