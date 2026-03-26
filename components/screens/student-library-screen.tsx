@@ -21,6 +21,12 @@ import { Input } from "@/components/ui/input";
 const subjects = ["All", "Physics", "Chemistry", "Mathematics"] as const;
 type SubjectFilter = (typeof subjects)[number];
 
+function getPdfFilename(item: StudentLibraryItemResponse, serverFilename: string): string {
+  const sourceName = item.file_name?.trim() || serverFilename.trim() || item.title.trim() || item.id;
+  const baseName = sourceName.replace(/\.[^/.]+$/, "");
+  return `${baseName}.pdf`;
+}
+
 export function StudentLibraryScreen() {
   const {
     studentYear,
@@ -112,7 +118,7 @@ export function StudentLibraryScreen() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = filename;
+      link.download = getPdfFilename(item, filename);
       document.body.appendChild(link);
       link.click();
       link.remove();

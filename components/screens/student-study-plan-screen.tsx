@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, Circle, Clock, Calendar, BookOpen, AlertCircle, ChevronDown, Lock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, Calendar, BookOpen, AlertCircle, ChevronDown, Lock, Youtube } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import {
     getStudyPlan,
@@ -231,12 +231,12 @@ export function StudentStudyPlanScreen() {
             {/* Header */}
             <div className="sticky top-0 z-10 border-b border-border/40 bg-background/80 px-4 py-3 backdrop-blur-md">
                 <div className="flex items-center gap-3">
-                    <button
+                    {/* <button
                         onClick={() => navigate("student-home")}
                         className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 hover:bg-muted"
                     >
                         <ArrowLeft className="h-4 w-4" />
-                    </button>
+                    </button> */}
                     <div>
                         <h1 className="text-lg font-bold">My Study Plan</h1>
                         <p className="text-xs text-muted-foreground">{progress}% Completed</p>
@@ -384,6 +384,14 @@ function TaskCard({
         "default": "bg-accent/10 text-accent border-accent/20"
     };
 
+    // YouTube video links for subtopics (Topic/Subtopic -> YouTube URL)
+    const youtubeLinks: Record<string, string> = {
+        "Deep dive into Electrostatics": "https://www.youtube.com/watch?v=E8dMci9SD9g&list=PLQ9cqMufvw5g7CatmW1GIOAOU5PchFpvi",
+        "Problem Solving: Electric Charges and Fields": "https://www.youtube.com/watch?v=eCs-LpGv5vA",
+        "Physics Advanced Practice": "https://www.youtube.com/watch?v=oKDnW8SeBiU&list=PLxyGaR3hEy3isOMa8qRwN4KXwDfx3YLT_",
+        // Add more links here as needed
+    };
+
     const colorClass = subjectColors[task.subject] || subjectColors["default"];
 
     const completedSubtopics = task.completed_subtopics || [];
@@ -479,6 +487,7 @@ function TaskCard({
                             <div className="space-y-2">
                                 {task.subtopics.map((subtopic, idx) => {
                                     const isChecked = completedSubtopics.includes(subtopic);
+                                    const youtubeLink = youtubeLinks[subtopic];
                                     return (
                                         <div
                                             key={idx}
@@ -486,16 +495,33 @@ function TaskCard({
                                                 e.stopPropagation();
                                                 if (onToggleSubtopic) onToggleSubtopic(task.id, subtopic);
                                             }}
-                                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 cursor-pointer transition-colors"
+                                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 cursor-pointer transition-colors group"
                                         >
                                             <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors
                                                  ${isChecked ? 'bg-accent border-accent text-accent-foreground' : 'border-muted-foreground'}
                                              `}>
                                                 {isChecked && <CheckCircle2 className="h-3 w-3" />}
                                             </div>
-                                            <span className={`text-sm ${isChecked ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                                            <span className={`flex-1 text-sm ${isChecked ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                                                 {subtopic}
                                             </span>
+                                            <a
+                                                href={youtubeLink || '#'}
+                                                target={youtubeLink ? "_blank" : undefined}
+                                                rel={youtubeLink ? "noopener noreferrer" : undefined}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (youtubeLink && onToggleSubtopic && !isChecked) {
+                                                        onToggleSubtopic(task.id, subtopic);
+                                                    }
+                                                    if (!youtubeLink) {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                                className={`p-1.5 rounded-full transition-colors ${youtubeLink ? 'hover:bg-red-500/10 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+                                            >
+                                                <Youtube className="h-4 w-4 text-red-600" />
+                                            </a>
                                         </div>
                                     );
                                 })}
@@ -623,7 +649,7 @@ function QuizModal({ attemptId, authToken, questions, onComplete, onClose }: {
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-muted/50 rounded-full">
-                        <ArrowLeft className="h-4 w-4" /> {/* Should be X but reusing ArrowLeft for now or generic close */}
+                        {/* <ArrowLeft className="h-4 w-4" /> Should be X but reusing ArrowLeft for now or generic close */}
                     </button>
                 </div>
 

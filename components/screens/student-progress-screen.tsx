@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/app-context";
+import { PieChart } from "@mui/x-charts/PieChart";
 import {
   ApiError,
   getStudentHomeSummary,
@@ -81,6 +82,7 @@ export function StudentProgressScreen() {
   const [loading, setLoading] = useState(!studentProgressData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [isChartVisible, setIsChartVisible] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +155,31 @@ export function StudentProgressScreen() {
     });
   }, [tests]);
 
+  useEffect(() => {
+    if (loading) {
+      setIsChartVisible(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsChartVisible(true);
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loading]);
+
+  const pieData = useMemo(
+    () =>
+      subjectMarks.map((subject) => ({
+        id: subject.subject,
+        value: Number(subject.avg.toFixed(1)),
+        label: subject.subject,
+      })),
+    [subjectMarks],
+  );
+
   const rankHistory = progress?.rank_history ?? [];
   const topicMastery = progress?.topic_mastery ?? [];
 
@@ -172,7 +199,7 @@ export function StudentProgressScreen() {
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold text-foreground">My Progress</h1>
           {loading && (
-             <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           )}
         </div>
         <p className="text-sm text-muted-foreground">
@@ -207,7 +234,7 @@ export function StudentProgressScreen() {
             <Users className="h-5 w-5 text-accent" />
           </div>
           <span className="text-2xl font-bold text-foreground">
-             {progress?.total_students ?? 0}
+            {progress?.total_students ?? 0}
           </span>
           <span className="text-[11px] text-muted-foreground">Total Students</span>
         </div>
@@ -234,12 +261,47 @@ export function StudentProgressScreen() {
           <BarChart3 className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Subject-wise Marks</h2>
         </div>
-        <div className="flex flex-col gap-4">
-          {subjectMarks.map((subject) => {
-            const Icon = subjectIcons[subject.subject] || BarChart3;
-            return (
-              <div key={subject.subject} className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center gap-4">
+          <div
+            className="w-full overflow-hidden flex justify-center"
+            style={{
+              maskImage: isChartVisible
+                ? "conic-gradient(from 0deg at 50% 50%, black 0deg, black 360deg)"
+                : "conic-gradient(from 0deg at 50% 50%, black 0deg, transparent 0deg)",
+              WebkitMaskImage: isChartVisible
+                ? "conic-gradient(from 0deg at 50% 50%, black 0deg, black 360deg)"
+                : "conic-gradient(from 0deg at 50% 50%, black 0deg, transparent 0deg)",
+              transition: "mask-image 6000ms cubic-bezier(0.25, 0.46, 0.45, 0.94), -webkit-mask-image 6000ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+            }}
+          >
+            <PieChart
+              width={280}
+              height={180}
+              series={[
+                {
+                  data: pieData,
+                  innerRadius: 65,
+                  outerRadius: 85,
+                  paddingAngle: 2,
+                  cornerRadius: 5,
+                },
+              ]}
+              colors={[
+                "hsl(var(--primary))",
+                "hsl(var(--accent))",
+                "hsl(var(--warning))",
+              ]}
+              margin={{ top: 16, bottom: 16, left: 8, right: 8 }}
+              skipAnimation={false}
+              hideLegend
+            />
+          </div>
+
+          <div className="grid w-full grid-cols-3 gap-2">
+            {subjectMarks.map((subject) => {
+              const Icon = subjectIcons[subject.subject] || BarChart3;
+              return (
+                <div key={subject.subject} className="flex flex-col items-center gap-1.5 rounded-lg border border-border/70 bg-muted/30 p-2.5">
                   <Icon
                     className={`h-4 w-4 ${subject.subject === "Physics"
                       ? "text-primary"
@@ -248,33 +310,12 @@ export function StudentProgressScreen() {
                         : "text-warning"
                       }`}
                   />
-                  <span className="text-xs font-semibold text-foreground">{subject.subject}</span>
-                  <span className="ml-auto text-xs font-bold text-primary">{subject.avg.toFixed(1)}% avg</span>
+                  <span className="text-[10px] font-medium text-foreground">{subject.subject}</span>
+                  <span className="text-[11px] font-bold text-primary">{subject.avg.toFixed(1)}%</span>
                 </div>
-                <div className="flex items-end gap-1.5">
-                  {subject.scores.map((score: number, index: number) => (
-                    <div key={index} className="flex flex-1 flex-col items-center gap-1">
-                      <div className="w-full rounded-t-md bg-muted" style={{ height: "60px" }}>
-                        <div
-                          className={`w-full rounded-t-md transition-all ${subject.subject === "Physics"
-                            ? "bg-primary/70"
-                            : subject.subject === "Chemistry"
-                              ? "bg-accent/70"
-                              : "bg-warning/70"
-                            }`}
-                          style={{
-                            height: `${Math.max(0, Math.min(score, 100))}%`,
-                            marginTop: `${60 - (Math.max(0, Math.min(score, 100)) / 100) * 60}px`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-[9px] text-muted-foreground">T{index + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -283,17 +324,32 @@ export function StudentProgressScreen() {
           <TrendingUp className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Rank History</h2>
         </div>
-        <div className="flex h-40 items-end gap-2">
+        <div className="flex h-56 items-end gap-2">
           {rankHistory.length === 0 ? (
             <div className="w-full text-center text-xs text-muted-foreground">No history available</div>
           ) : (
             rankHistory.map((point: import('@/lib/api-client').RankPoint, index: number) => {
               const maxRank = Math.max(...rankHistory.map((item: import('@/lib/api-client').RankPoint) => item.rank));
-              const height = ((maxRank - point.rank) / Math.max(maxRank, 1)) * 100 + 20;
+              const height = Math.max(10, ((maxRank - point.rank) / Math.max(maxRank, 1)) * 100 + 30);
+              const colors = [
+                "bg-primary",
+                "bg-accent",
+                "bg-warning",
+              ];
+              const barColor = colors[index % colors.length];
+
+              if (point.rank === 0) {
+                return (
+                  <div key={`${point.week}-${index}`} className="flex flex-1 flex-col items-center justify-end gap-2 h-full">
+                    <span className="text-[10px] text-muted-foreground">{point.week}</span>
+                  </div>
+                );
+              }
+
               return (
-                <div key={`${point.week}-${index}`} className="flex flex-1 flex-col items-center gap-2">
+                <div key={`${point.week}-${index}`} className="flex flex-1 flex-col items-center justify-end gap-2 h-full">
                   <span className="text-[10px] font-medium text-muted-foreground">{point.rank}</span>
-                  <div className="w-full rounded-t-lg bg-primary/80 transition-all" style={{ height: `${Math.max(5, height)}%` }} />
+                  <div className={`w-full rounded-t-lg transition-all ${barColor}`} style={{ height: `${height}%` }} />
                   <span className="text-[10px] text-muted-foreground">{point.week}</span>
                 </div>
               );

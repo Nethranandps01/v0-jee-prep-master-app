@@ -47,7 +47,7 @@ class TeacherService:
         ]
         res = list(db.classes.aggregate(pipeline))
         total_students = res[0]["count"] if res else 0
-        
+
         # If no explicit student_ids, fallback to the 'students' counter field
         if total_students == 0:
             fallback = db.classes.aggregate([
@@ -66,7 +66,8 @@ class TeacherService:
             {"$group": {"_id": None, "avg": {"$avg": "$score"}}},
         ]
         avg_result = list(db.test_attempts.aggregate(avg_pipeline))
-        subject_avg = round(float(avg_result[0]["avg"]), 1) if avg_result else 0.0
+        subject_avg = round(
+            float(avg_result[0]["avg"]), 1) if avg_result else 0.0
 
         result = {
             "total_students": total_students,
@@ -99,7 +100,7 @@ class TeacherService:
             # If AI failed to provide ANY questions, we fallback to templates ONLY IF allowed, else error.
             # But with parallel batching, success is much more likely.
             if not question_set:
-                 raise HTTPException(
+                raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="AI question generation failed. Please try a smaller batch or retry.",
                 )
@@ -132,7 +133,8 @@ class TeacherService:
             event_type="paper",
             actor_id=str(teacher["_id"]),
             actor_role="teacher",
-            metadata={"paper_id": str(result.inserted_id), "subject": payload.subject},
+            metadata={"paper_id": str(
+                result.inserted_id), "subject": payload.subject},
         )
 
         return TeacherService._paper_payload(doc, include_question_set=True)
@@ -140,9 +142,11 @@ class TeacherService:
     @staticmethod
     def get_paper(db: Database, teacher: dict, paper_id: str) -> dict:
         oid = parse_object_id(paper_id, "paper_id")
-        paper = db.tests.find_one({"_id": oid, "creator_id": str(teacher["_id"])})
+        paper = db.tests.find_one(
+            {"_id": oid, "creator_id": str(teacher["_id"])})
         if not paper:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paper not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Paper not found")
         return TeacherService._paper_payload(paper, include_question_set=True)
 
     @staticmethod
@@ -153,17 +157,23 @@ class TeacherService:
         payload: TeacherPaperUpdateRequest,
     ) -> dict:
         oid = parse_object_id(paper_id, "paper_id")
-        existing = db.tests.find_one({"_id": oid, "creator_id": str(teacher["_id"])})
+        existing = db.tests.find_one(
+            {"_id": oid, "creator_id": str(teacher["_id"])})
         if not existing:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paper not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Paper not found")
 
-        updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+        updates = {k: v for k, v in payload.model_dump().items()
+                   if v is not None}
         if not updates:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No updates provided")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No updates provided")
 
         if "questions" in updates or "difficulty" in updates:
-            question_count = int(updates.get("questions", existing.get("questions", 0) or 0))
-            difficulty = str(updates.get("difficulty", existing.get("difficulty", "Medium")))
+            question_count = int(updates.get(
+                "questions", existing.get("questions", 0) or 0))
+            difficulty = str(updates.get(
+                "difficulty", existing.get("difficulty", "Medium")))
             subject = str(existing.get("subject", "Physics"))
             question_set, question_source = await build_question_set_with_source(
                 db,
@@ -210,11 +220,14 @@ class TeacherService:
         payload: AssignPaperRequest,
     ) -> dict:
         oid = parse_object_id(paper_id, "paper_id")
-        paper = db.tests.find_one({"_id": oid, "creator_id": str(teacher["_id"])})
+        paper = db.tests.find_one(
+            {"_id": oid, "creator_id": str(teacher["_id"])})
         if not paper:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paper not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Paper not found")
 
-        class_oids = [parse_object_id(class_id, "class_id") for class_id in payload.class_ids]
+        class_oids = [parse_object_id(class_id, "class_id")
+                      for class_id in payload.class_ids]
         classes = list(
             db.classes.find(
                 {
@@ -233,13 +246,15 @@ class TeacherService:
         student_ids: list[str] = []
         for cls in classes:
             if cls.get("student_ids"):
-                cls_student_ids = [str(student_id) for student_id in cls["student_ids"]]
+                cls_student_ids = [str(student_id)
+                                   for student_id in cls["student_ids"]]
                 student_ids.extend(cls_student_ids)
             else:
                 fallback_students += int(cls.get("students", 0))
 
         unique_student_ids = sorted(set(student_ids))
-        students = len(unique_student_ids) if unique_student_ids else fallback_students
+        students = len(
+            unique_student_ids) if unique_student_ids else fallback_students
 
         db.tests.update_one(
             {"_id": oid},
@@ -264,7 +279,8 @@ class TeacherService:
             event_type="test",
             actor_id=str(teacher["_id"]),
             actor_role="teacher",
-            metadata={"paper_id": str(oid), "class_count": len(classes), "students": students},
+            metadata={"paper_id": str(oid), "class_count": len(
+                classes), "students": students},
         )
 
         if unique_student_ids:
@@ -288,7 +304,8 @@ class TeacherService:
 
     @staticmethod
     def list_classes(db: Database, teacher: dict) -> list[dict]:
-        docs = db.classes.find({"teacher_id": str(teacher["_id"])}).sort("created_at", -1)
+        docs = db.classes.find(
+            {"teacher_id": str(teacher["_id"])}).sort("created_at", -1)
         return [TeacherService._class_payload(doc) for doc in docs]
 
     @staticmethod
@@ -315,7 +332,8 @@ class TeacherService:
             event_type="class",
             actor_id=str(teacher["_id"]),
             actor_role="teacher",
-            metadata={"class_id": str(result.inserted_id), "year": payload.year, "subject": payload.subject},
+            metadata={"class_id": str(
+                result.inserted_id), "year": payload.year, "subject": payload.subject},
         )
 
         return TeacherService._class_payload(doc)
@@ -323,15 +341,19 @@ class TeacherService:
     @staticmethod
     def class_students(db: Database, teacher: dict, class_id: str) -> list[dict]:
         oid = parse_object_id(class_id, "class_id")
-        cls = db.classes.find_one({"_id": oid, "teacher_id": str(teacher["_id"])})
+        cls = db.classes.find_one(
+            {"_id": oid, "teacher_id": str(teacher["_id"])})
         if not cls:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
 
-        student_ids = [parse_object_id(sid, "student_id") for sid in cls.get("student_ids", [])]
+        student_ids = [parse_object_id(sid, "student_id")
+                       for sid in cls.get("student_ids", [])]
         students = []
         if student_ids:
             docs = db.users.find(
-                {"_id": {"$in": student_ids}, "role": "student"}, {"password_hash": 0}
+                {"_id": {"$in": student_ids}, "role": "student"}, {
+                    "password_hash": 0}
             )
             for user in docs:
                 payload = serialize_id(user)
@@ -342,16 +364,19 @@ class TeacherService:
     @staticmethod
     def list_assignable_students(db: Database, teacher: dict, class_id: str) -> list[dict]:
         oid = parse_object_id(class_id, "class_id")
-        cls = db.classes.find_one({"_id": oid, "teacher_id": str(teacher["_id"])})
+        cls = db.classes.find_one(
+            {"_id": oid, "teacher_id": str(teacher["_id"])})
         if not cls:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
 
         year = cls.get("year")
         query: dict = {"role": "student", "status": "active"}
         if year:
             query["year"] = year
 
-        assigned_ids = {str(student_id) for student_id in cls.get("student_ids", [])}
+        assigned_ids = {str(student_id)
+                        for student_id in cls.get("student_ids", [])}
         docs = db.users.find(query, {"password_hash": 0}).sort("name", 1)
 
         students: list[dict] = []
@@ -371,14 +396,17 @@ class TeacherService:
         student_ids: list[str],
     ) -> dict:
         oid = parse_object_id(class_id, "class_id")
-        cls = db.classes.find_one({"_id": oid, "teacher_id": str(teacher["_id"])})
+        cls = db.classes.find_one(
+            {"_id": oid, "teacher_id": str(teacher["_id"])})
         if not cls:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
 
         unique_student_ids = list(dict.fromkeys(student_ids))
         valid_student_ids: list[str] = []
         if unique_student_ids:
-            student_oids = [parse_object_id(student_id, "student_id") for student_id in unique_student_ids]
+            student_oids = [parse_object_id(
+                student_id, "student_id") for student_id in unique_student_ids]
             query: dict = {
                 "_id": {"$in": student_oids},
                 "role": "student",
@@ -395,7 +423,8 @@ class TeacherService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="One or more students are invalid or do not match class year",
                 )
-            valid_student_ids = [student_id for student_id in unique_student_ids if student_id in found_ids]
+            valid_student_ids = [
+                student_id for student_id in unique_student_ids if student_id in found_ids]
 
         now = datetime.now(timezone.utc)
         db.classes.update_one(
@@ -418,7 +447,8 @@ class TeacherService:
             event_type="class",
             actor_id=str(teacher["_id"]),
             actor_role="teacher",
-            metadata={"class_id": str(oid), "student_count": len(valid_student_ids)},
+            metadata={"class_id": str(
+                oid), "student_count": len(valid_student_ids)},
         )
 
         return TeacherService._class_payload(updated)
@@ -460,7 +490,8 @@ class TeacherService:
             event_type="plan",
             actor_id=str(teacher["_id"]),
             actor_role="teacher",
-            metadata={"lesson_id": str(result.inserted_id), "year": payload.year},
+            metadata={"lesson_id": str(
+                result.inserted_id), "year": payload.year},
         )
 
         return TeacherService._lesson_payload(doc)
@@ -473,9 +504,11 @@ class TeacherService:
         payload: LessonPlanUpdateRequest,
     ) -> dict:
         oid = parse_object_id(lesson_id, "lesson_id")
-        updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+        updates = {k: v for k, v in payload.model_dump().items()
+                   if v is not None}
         if not updates:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No updates provided")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No updates provided")
         updates["updated_at"] = datetime.now(timezone.utc)
 
         result = db.lesson_plans.update_one(
@@ -506,7 +539,8 @@ class TeacherService:
     @staticmethod
     def delete_lesson_plan(db: Database, teacher: dict, lesson_id: str) -> None:
         oid = parse_object_id(lesson_id, "lesson_id")
-        lesson = db.lesson_plans.find_one({"_id": oid, "teacher_id": str(teacher["_id"])})
+        lesson = db.lesson_plans.find_one(
+            {"_id": oid, "teacher_id": str(teacher["_id"])})
         if not lesson:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -534,7 +568,8 @@ class TeacherService:
 
     @staticmethod
     def list_library_items(db: Database, teacher: dict) -> list[dict]:
-        docs = db.library_items.find({"teacher_id": str(teacher["_id"])}).sort("created_at", -1)
+        docs = db.library_items.find(
+            {"teacher_id": str(teacher["_id"])}).sort("created_at", -1)
         return [TeacherService._library_payload(doc) for doc in docs]
 
     @staticmethod
@@ -570,7 +605,7 @@ class TeacherService:
         if file_payload:
             db.library_files.insert_one(
                 {
-                    "library_item_id": result.inserted_id,  # Use native ObjectId
+                    "library_item_id": str(result.inserted_id),
                     "filename": file_payload["filename"],
                     "content_type": file_payload["content_type"],
                     "size_bytes": file_payload["size_bytes"],
@@ -608,7 +643,8 @@ class TeacherService:
         )
 
         if not publish_now:
-            admin_ids = [str(admin["_id"]) for admin in db.users.find({"role": "admin", "status": "active"}, {"_id": 1})]
+            admin_ids = [str(admin["_id"]) for admin in db.users.find(
+                {"role": "admin", "status": "active"}, {"_id": 1})]
             NotificationService.create_for_users(
                 db,
                 user_ids=admin_ids,
@@ -657,7 +693,8 @@ class TeacherService:
         safe_filename = TeacherService._safe_filename(filename)
         extension = os.path.splitext(safe_filename)[1].lower()
         guessed_type, _ = mimetypes.guess_type(safe_filename)
-        normalized_content_type = (content_type or guessed_type or "application/octet-stream").strip()
+        normalized_content_type = (
+            content_type or guessed_type or "application/octet-stream").strip()
 
         if material_type == "PDF" and extension != ".pdf":
             raise HTTPException(
@@ -670,7 +707,8 @@ class TeacherService:
                 detail="DOCX type requires a .docx file",
             )
         if material_type == "Image":
-            is_image_extension = extension in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+            is_image_extension = extension in {
+                ".png", ".jpg", ".jpeg", ".gif", ".webp"}
             if not (normalized_content_type.startswith("image/") or is_image_extension):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -733,10 +771,11 @@ class TeacherService:
         Includes proctoring details (violation_reason).
         """
         sid_oid = parse_object_id(student_id, "student_id")
-        #Verify student exists
+        # Verify student exists
         student = db.users.find_one({"_id": sid_oid, "role": "student"})
         if not student:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
         # Fetch attempts
         attempts = list(
@@ -752,48 +791,55 @@ class TeacherService:
             questions_detail = []
 
             if test_id:
-                test = db.tests.find_one({"_id": parse_object_id(test_id, "test_id")})
+                test = db.tests.find_one(
+                    {"_id": parse_object_id(test_id, "test_id")})
                 if test:
                     test_title = test.get("title", "Untitled")
-                    
+
                     # Build Question Map
                     q_map = {q["id"]: q for q in test.get("question_set", [])}
-                    
+
                     # Answers
                     correct_answers_ids = attempt.get("correct_answers", [])
-                    incorrect_answers_ids = attempt.get("incorrect_answers", [])
+                    incorrect_answers_ids = attempt.get(
+                        "incorrect_answers", [])
                     # In a real app, we'd store the actual selected option index in attempt.
                     # For now, we'll try to reconstruct or use what's available.
                     # The attempt schema usually stores valid question IDs in lists.
-                    
-                    # IMPORTANT: The current attempt schema might not store the *exact* selected option index 
+
+                    # IMPORTANT: The current attempt schema might not store the *exact* selected option index
                     # for every question in a structured way that's easy to retrieve here without 'answers' map.
-                    # Let's check if 'answers' (map of q_id -> option_index) is saved. 
+                    # Let's check if 'answers' (map of q_id -> option_index) is saved.
                     # If not, we might only be able to show if it was correct/incorrect.
-                    
-                    # Checking `StudentService.submit_attempt`... it saves `answers`? 
-                    # The `SubmitAttemptRequest` has `answers`. 
+
+                    # Checking `StudentService.submit_attempt`... it saves `answers`?
+                    # The `SubmitAttemptRequest` has `answers`.
                     # The `test_attempts` collection update in `student_service.py` typically matches the request.
                     # Let's assume `answers` dict is present in attempt document.
-                    
-                    student_answers = attempt.get("answers", {}) # q_id -> index
-                    time_spent_map = attempt.get("time_spent", {}) # q_id -> seconds
-                    
+
+                    student_answers = attempt.get(
+                        "answers", {})  # q_id -> index
+                    time_spent_map = attempt.get(
+                        "time_spent", {})  # q_id -> seconds
+
                     for q in test.get("question_set", []):
                         qid = q["id"]
                         selected_idx = student_answers.get(qid)
                         correct_idx = q.get("correct")
                         time_taken = time_spent_map.get(qid, 0)
-                        
-                        try:
-                             # 0-based index to option text
-                            selected_text = q["options"][selected_idx] if selected_idx is not None and 0 <= selected_idx < len(q["options"]) else None
-                            correct_text = q["options"][correct_idx] if correct_idx is not None and 0 <= correct_idx < len(q["options"]) else "Unknown"
-                        except (IndexError, TypeError):
-                             selected_text = "Invalid"
-                             correct_text = "Error"
 
-                        is_right = (selected_idx == correct_idx) and (selected_idx is not None)
+                        try:
+                            # 0-based index to option text
+                            selected_text = q["options"][selected_idx] if selected_idx is not None and 0 <= selected_idx < len(
+                                q["options"]) else None
+                            correct_text = q["options"][correct_idx] if correct_idx is not None and 0 <= correct_idx < len(
+                                q["options"]) else "Unknown"
+                        except (IndexError, TypeError):
+                            selected_text = "Invalid"
+                            correct_text = "Error"
+
+                        is_right = (selected_idx == correct_idx) and (
+                            selected_idx is not None)
 
                         questions_detail.append({
                             "question_text": q.get("text", "Question"),
@@ -803,10 +849,11 @@ class TeacherService:
                             "explanation": q.get("explanation"),
                             "time_spent": time_taken,
                         })
-            
+
             # Proctoring Check
             violation = attempt.get("violation_reason")
-            is_suspicious = bool(violation) or attempt.get("auto_submitted", False)
+            is_suspicious = bool(violation) or attempt.get(
+                "auto_submitted", False)
 
             results.append({
                 "attempt_id": str(attempt["_id"]),
@@ -819,7 +866,7 @@ class TeacherService:
                 "is_suspicious": is_suspicious,
                 "questions": questions_detail,
             })
-        
+
         return results
 
     @staticmethod

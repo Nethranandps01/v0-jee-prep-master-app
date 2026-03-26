@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.schemas.student import FeedbackRequest, SaveAnswersRequest
 from app.services.activity_service import ActivityService
 from app.services.ai_service import generate_chat_reply
+from app.services.analysis_service import AnalysisService
 from app.services.notification_service import NotificationService
 from app.services.planner_service import PlannerService
 from app.services.public_resource import PublicResourceService
@@ -38,7 +39,6 @@ class StudentService:
         """Clear all student-related caches (dashboard, home, tests, progress)"""
         cache_delete_pattern(f"student:*:{student_id}:*")
 
-
     @staticmethod
     def dashboard_summary(db: Database, student: dict) -> dict:
         """
@@ -57,7 +57,8 @@ class StudentService:
         # Progress has two variants; prefer the richer v1 result when available.
         full_progress = StudentService.progress(db, student)
 
-        tests = StudentService.list_tests(db, student, status_filter=None, subject=None)
+        tests = StudentService.list_tests(
+            db, student, status_filter=None, subject=None)
         notifications = StudentService.list_notifications(db, student)
 
         payload = {
@@ -68,7 +69,6 @@ class StudentService:
         }
         cache_set(cache_key, payload, ttl=timedelta(minutes=3))
         return payload
-
 
     @staticmethod
     def home_summary(db: Database, student: dict) -> dict:
@@ -94,25 +94,33 @@ class StudentService:
         ]
         stats = list(db.test_attempts.aggregate(stats_pipeline))
         completed_tests = stats[0].get("completed_tests", 0) if stats else 0
-        avg_score = round(float(stats[0].get("avg_score", 0.0) or 0.0), 1) if stats else 0.0
+        avg_score = round(
+            float(stats[0].get("avg_score", 0.0) or 0.0), 1) if stats else 0.0
 
         # 2. Assigned tests (optimized query)
         access_clauses = []
-        if class_ids: access_clauses.append({"assigned_to_class_ids": {"$in": class_ids}})
-        if year: access_clauses.append({"year": year, "assigned": True, "$or": [{"assigned_to_class_ids": {"$exists": False}}, {"assigned_to_class_ids": {"$size": 0}}]})
-        
+        if class_ids:
+            access_clauses.append(
+                {"assigned_to_class_ids": {"$in": class_ids}})
+        if year:
+            access_clauses.append({"year": year, "assigned": True, "$or": [
+                                  {"assigned_to_class_ids": {"$exists": False}}, {"assigned_to_class_ids": {"$size": 0}}]})
+
         assigned_query = {"status": {"$in": ["assigned", "active"]}}
-        if access_clauses: assigned_query["$or"] = access_clauses
-        else: assigned_query["_id"] = {"$exists": False}
-        
+        if access_clauses:
+            assigned_query["$or"] = access_clauses
+        else:
+            assigned_query["_id"] = {"$exists": False}
+
         assigned_tests_count = db.tests.count_documents(assigned_query)
 
         # 3. Streak (Minimal fetch)
         submissions = list(
             db.test_attempts.find(
-                {"student_id": student_id, "status": "submitted", "submitted_at": {"$ne": None}},
+                {"student_id": student_id, "status": "submitted",
+                    "submitted_at": {"$ne": None}},
                 {"submitted_at": 1},
-            ).sort("submitted_at", -1).limit(30) # Fetch last 30 for streak
+            ).sort("submitted_at", -1).limit(30)  # Fetch last 30 for streak
         )
         unique_dates = []
         seen = set()
@@ -121,15 +129,17 @@ class StudentService:
             if day not in seen:
                 seen.add(day)
                 unique_dates.append(day)
-        
+
         streak = 0
         if unique_dates:
             today = datetime.now(timezone.utc).date()
             if (today - unique_dates[0]).days <= 1:
                 streak = 1
                 for i in range(len(unique_dates) - 1):
-                    if (unique_dates[i] - unique_dates[i+1]).days == 1: streak += 1
-                    else: break
+                    if (unique_dates[i] - unique_dates[i+1]).days == 1:
+                        streak += 1
+                    else:
+                        break
 
         result = {
             "assigned_tests": assigned_tests_count,
@@ -191,8 +201,9 @@ class StudentService:
                     ],
                 }
             )
-        
-        main_query = {"$or": access_clauses} if access_clauses else {"_id": {"$exists": False}}
+
+        main_query = {"$or": access_clauses} if access_clauses else {
+            "_id": {"$exists": False}}
         if subject:
             main_query["subject"] = subject
 
@@ -200,24 +211,27 @@ class StudentService:
 
         # Fetch assigned tests
         assigned_tests = list(
-            db.tests.find(main_query, test_list_projection).sort("created_at", -1)
+            db.tests.find(main_query, test_list_projection).sort(
+                "created_at", -1)
         )
-        
+
         # Identify which submitted tests are missing from the assigned list
         assigned_ids = {str(t["_id"]) for t in assigned_tests}
-        missing_ids = [parse_object_id(tid, "test_id") for tid in all_test_ids if tid not in assigned_ids]
-        
+        missing_ids = [parse_object_id(tid, "test_id")
+                       for tid in all_test_ids if tid not in assigned_ids]
+
         # Batch fetch missing tests
         additional_tests = []
         if missing_ids:
             missing_query = {"_id": {"$in": missing_ids}}
             if subject:
                 missing_query["subject"] = subject
-            additional_tests = list(db.tests.find(missing_query, test_list_projection))
+            additional_tests = list(db.tests.find(
+                missing_query, test_list_projection))
 
         # Combine and sort
         all_tests = assigned_tests + additional_tests
-        
+
         def _created_at_key(doc: dict) -> datetime:
             created_at = doc.get("created_at")
             if isinstance(created_at, datetime):
@@ -228,8 +242,8 @@ class StudentService:
 
         # Map attempts for O(1) lookup
         attempt_map = {
-            str(a.get("test_id")): a 
-            for a in submitted_attempts 
+            str(a.get("test_id")): a
+            for a in submitted_attempts
             if a.get("test_id")
         }
 
@@ -238,7 +252,7 @@ class StudentService:
             payload = serialize_id(test)
             test_id = payload["id"]
             attempt = attempt_map.get(test_id)
-            
+
             if attempt:
                 payload["score"] = attempt.get("score")
                 payload["attempt_id"] = str(attempt.get("_id"))
@@ -247,7 +261,7 @@ class StudentService:
                 payload["score"] = None
                 payload["attempt_id"] = None
                 payload["status"] = "assigned"
-            
+
             if status_filter and payload["status"] != status_filter:
                 continue
 
@@ -263,7 +277,8 @@ class StudentService:
 
         test = db.tests.find_one({"_id": test_oid})
         if not test:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Test not found")
 
         if not StudentService._is_test_assigned_to_student(db, student, test):
             raise HTTPException(
@@ -295,7 +310,8 @@ class StudentService:
                     str(test.get("subject", "Physics")),
                     total_questions,
                     str(test.get("difficulty", "Medium")),
-                    require_ai=bool((get_settings().openai_api_key or "").strip()),
+                    require_ai=bool(
+                        (get_settings().openai_api_key or "").strip()),
                 )
             except RuntimeError as exc:
                 raise HTTPException(
@@ -375,9 +391,11 @@ class StudentService:
         student_id = str(student["_id"])
         attempt_oid = parse_object_id(attempt_id, "attempt_id")
 
-        attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
+        attempt = db.test_attempts.find_one(
+            {"_id": attempt_oid, "student_id": student_id})
         if not attempt:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
 
         if attempt.get("status") != "in_progress":
             raise HTTPException(
@@ -426,18 +444,22 @@ class StudentService:
         student_id = str(student["_id"])
         attempt_oid = parse_object_id(attempt_id, "attempt_id")
 
-        attempt = db.test_attempts.find_one({"_id": attempt_oid, "student_id": student_id})
+        attempt = db.test_attempts.find_one(
+            {"_id": attempt_oid, "student_id": student_id})
         if not attempt:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
-        
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found")
+
         if attempt.get("status") == "submitted":
-            raise HTTPException(status_code=409, detail="Attempt already submitted")
-        
+            raise HTTPException(
+                status_code=409, detail="Attempt already submitted")
+
         cleaned_violation_reason = (violation_reason or "").strip() or None
         if time_spent:
             db.test_attempts.update_one(
                 {"_id": attempt_oid},
-                {"$set": {f"time_spent.{k}": v for k, v in time_spent.items() if isinstance(v, int) and v >= 0}}
+                {"$set": {f"time_spent.{k}": v for k,
+                          v in time_spent.items() if isinstance(v, int) and v >= 0}}
             )
 
         attempt = db.test_attempts.find_one({"_id": attempt_oid})  # Refresh
@@ -468,15 +490,16 @@ class StudentService:
             total_questions = len(question_set)
 
         if question_set:
-            scoring_res = ScoringService.calculate_jee_score(question_set, answers)
-            
+            scoring_res = ScoringService.calculate_jee_score(
+                question_set, answers)
+
             total_jee_score = scoring_res["score"]
             correct_count = scoring_res["stats"]["correct"]
             wrong_count = scoring_res["stats"]["wrong"]
             unattempted_count = scoring_res["stats"]["unattempted"]
             partial_count = scoring_res["stats"]["partial"]
             accuracy = scoring_res["accuracy"]
-            
+
             # Determine max score based on question types (Main = 4, Adv Single = 3, Adv Multi = 4)
             from app.services.scoring_service import JEE_RULES
             max_possible = 0
@@ -485,27 +508,91 @@ class StudentService:
                 if qtype == "ADV_SINGLE":
                     max_possible += 3
                 else:
-                    max_possible += 4 # Default for MCQ_MAIN, NUMERICAL_MAIN, ADV_MULTIPLE
-            
-            score_percent = round((total_jee_score / max_possible * 100), 1) if max_possible > 0 else 0.0
-            
-            # AI Analysis (Bonus Step 7)
-            # Find subjects of wrong/unattempted questions for analysis
-            weak_topics = set()
-            for q in question_set:
-                qid = str(q.get("id"))
-                if answers.get(qid) is None or ScoringService._is_wrong(q, answers.get(qid)):
-                    if q.get("subject"):
-                        weak_topics.add(q.get("subject"))
-            
-            analysis = {
-                "weak_areas": list(weak_topics),
-                "message": "Focus more on " + ", ".join(list(weak_topics)[:2]) + " to improve your rank." if weak_topics else "Excellent performance! Keep it up.",
-                "total_score": total_jee_score,
-                "max_score": max_possible,
-                "partial_correct": partial_count,
-            }
-            
+                    max_possible += 4  # Default for MCQ_MAIN, NUMERICAL_MAIN, ADV_MULTIPLE
+
+            score_percent = round(
+                (total_jee_score / max_possible * 100), 1) if max_possible > 0 else 0.0
+
+            # Build comprehensive performance analysis
+            try:
+                # Create session object for analysis
+                session = {
+                    "questions": question_set,
+                    "answers": answers,
+                }
+
+                # Generate complete analysis
+                complete_analysis = AnalysisService.build_complete_analysis(
+                    session=session,
+                    question_set=question_set,
+                    subject=attempt.get("subject", "General"),
+                )
+
+                # Generate AI feedback asynchronously (non-blocking)
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                ai_feedback = None
+                try:
+                    # Try to generate AI feedback
+                    ai_feedback = loop.run_until_complete(
+                        AnalysisService.generate_ai_feedback(
+                            analysis=complete_analysis,
+                            weak_topics={
+                                "weak_topics": complete_analysis["weak_topics"],
+                                "strong_topics": complete_analysis["strong_topics"],
+                            },
+                            patterns={
+                                "patterns": complete_analysis["mistake_patterns"],
+                                "mistake_examples": complete_analysis["mistake_examples"],
+                            },
+                            session_subject=attempt.get("subject", "JEE"),
+                        )
+                    )
+                except Exception as e:
+                    # If AI feedback fails, fall back to default message
+                    weak_list = [t["topic"] for t in complete_analysis.get("weak_topics", [])[
+                        :2]]
+                    if weak_list:
+                        ai_feedback = f"Focus on improving {', '.join(weak_list)} to boost your score in the next attempt."
+                    else:
+                        ai_feedback = "Great performance! Keep practicing to maintain excellence."
+
+                # Construct analysis dictionary with all insights
+                analysis = {
+                    "weak_areas": [t["topic"] for t in complete_analysis.get("weak_topics", [])],
+                    "strong_areas": [t["topic"] for t in complete_analysis.get("strong_topics", [])],
+                    "message": ai_feedback or "Review your performance and focus on weak topics.",
+                    "total_score": total_jee_score,
+                    "max_score": max_possible,
+                    "partial_correct": partial_count,
+                    "overall_accuracy": complete_analysis.get("overall_accuracy", 0),
+                    "topic_breakdown": complete_analysis.get("topic_breakdown", {}),
+                    "mistake_patterns": complete_analysis.get("mistake_patterns", {}),
+                    "weak_topics_detailed": complete_analysis.get("weak_topics", []),
+                }
+
+            except Exception as analysis_error:
+                # Fallback to simple analysis if comprehensive analysis fails
+                weak_topics = set()
+                for q in question_set:
+                    qid = str(q.get("id"))
+                    if answers.get(qid) is None or ScoringService._is_wrong(q, answers.get(qid)):
+                        if q.get("subject"):
+                            weak_topics.add(q.get("subject"))
+
+                analysis = {
+                    "weak_areas": list(weak_topics),
+                    "message": "Focus more on " + ", ".join(list(weak_topics)[:2]) + " to improve your rank." if weak_topics else "Excellent performance! Keep it up.",
+                    "total_score": total_jee_score,
+                    "max_score": max_possible,
+                    "partial_correct": partial_count,
+                }
+
             correct_answers = correct_count
             incorrect_answers = wrong_count
             unattempted = unattempted_count
@@ -568,7 +655,8 @@ class StudentService:
             notification_type="result",
         )
 
-        test_doc = StudentService._find_test_by_id(db, str(attempt.get("test_id") or ""))
+        test_doc = StudentService._find_test_by_id(
+            db, str(attempt.get("test_id") or ""))
         teacher_id = str(test_doc.get("creator_id") or "") if test_doc else ""
         if teacher_id and auto_submitted:
             NotificationService.create_for_user(
@@ -595,7 +683,9 @@ class StudentService:
             "accuracy": accuracy,
             "partial_correct": partial_count,
             "raw_score": total_jee_score,
-            "max_score": max_possible
+            "max_score": max_possible,
+            "analysis": analysis,
+            "ai_feedback": analysis.get("message", ""),
         }
 
     @staticmethod
@@ -606,7 +696,8 @@ class StudentService:
             {"_id": attempt_oid, "student_id": student_id, "status": "submitted"}
         )
         if not attempt:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
         answers = attempt.get("answers", {})
         question_set = attempt.get("question_set") or []
@@ -614,7 +705,8 @@ class StudentService:
         questions: list[dict] = []
         for index, question in enumerate(question_set, start=1):
             question_id = str(question.get("id") or f"q{index}")
-            selected = StudentService._normalize_answer(answers.get(question_id))
+            selected = StudentService._normalize_answer(
+                answers.get(question_id))
             correct_answer = int(question.get("correct", 0) or 0)
             questions.append(
                 {
@@ -629,6 +721,8 @@ class StudentService:
                         question.get("explanation")
                         or "Review the concept for this question and retry a similar problem."
                     ),
+                    "topic": str(question.get("topic") or "General"),
+                    "subtopic": str(question.get("subtopic") or "General"),
                 }
             )
 
@@ -648,8 +742,9 @@ class StudentService:
             "accuracy": float(attempt.get("accuracy") or 0.0),
             "submitted_at": attempt.get("submitted_at", datetime.now(timezone.utc)),
             "questions": questions,
+            "analysis": attempt.get("analysis", {}),
+            "ai_feedback": attempt.get("analysis", {}).get("message", ""),
         }
-
 
     @staticmethod
     def progress(db: Database, student: dict) -> dict:
@@ -662,28 +757,35 @@ class StudentService:
         # 1. Subject Breakdown & Mastery (Aggregation)
         mastery_results = list(db.test_attempts.aggregate([
             {"$match": {"student_id": student_id, "status": "submitted"}},
-            {"$group": {"_id": "$subject", "avg": {"$avg": "$score"}, "count": {"$sum": 1}}}
+            {"$group": {"_id": "$subject", "avg": {
+                "$avg": "$score"}, "count": {"$sum": 1}}}
         ]))
-        topic_mastery = [{"topic": r["_id"] or "General", "mastery": round(float(r.get("avg", 0.0) or 0.0), 1)} for r in mastery_results]
-        if not topic_mastery: topic_mastery = [{"topic": "General", "mastery": 0.0}]
+        topic_mastery = [{"topic": r["_id"] or "General", "mastery": round(
+            float(r.get("avg", 0.0) or 0.0), 1)} for r in mastery_results]
+        if not topic_mastery:
+            topic_mastery = [{"topic": "General", "mastery": 0.0}]
 
         total_completed = sum(r.get("count", 0) for r in mastery_results)
-        overall_avg = round(sum((r.get("avg", 0.0) or 0.0) * r.get("count", 0) for r in mastery_results) / total_completed, 1) if total_completed else 0.0
+        overall_avg = round(sum((r.get("avg", 0.0) or 0.0) * r.get("count", 0)
+                            for r in mastery_results) / total_completed, 1) if total_completed else 0.0
 
         # 2. Overall Rank (Optimized - Count higher scores)
         # Calculate my average score first
         my_avg_result = list(db.test_attempts.aggregate([
-            {"$match": {"student_id": student_id, "status": "submitted", "submitted_at": {"$ne": None}}},
+            {"$match": {"student_id": student_id,
+                        "status": "submitted", "submitted_at": {"$ne": None}}},
             {"$group": {"_id": None, "score": {"$avg": "$score"}}}
         ]))
-        my_avg = float(my_avg_result[0].get("score", 0.0) or 0.0) if my_avg_result else 0.0
-        
+        my_avg = float(my_avg_result[0].get(
+            "score", 0.0) or 0.0) if my_avg_result else 0.0
+
         # Count students with higher average score
         # Note regarding performance: Ideally this should be a pre-calculated status on the User model
         # or a materialized view. For now, we use a slightly better aggregation than fetching all.
-        
+
         # Determine total students (approximate active count)
-        total_students = db.users.count_documents({"role": "student", "status": "active"})
+        total_students = db.users.count_documents(
+            {"role": "student", "status": "active"})
 
         curr_rank = 1
         if my_avg > 0:
@@ -701,7 +803,7 @@ class StudentService:
             curr_rank = total_students if total_students > 0 else 1
 
         # 3. Rank History (Last 6 attempts) - Simplified
-        # We can just return the score history as a proxy for progress, 
+        # We can just return the score history as a proxy for progress,
         # or minimal mock history if real historical rank calculation is too expensive.
         # Let's return the last 6 test scores.
         rank_history = []
@@ -709,14 +811,15 @@ class StudentService:
             {"student_id": student_id, "status": "submitted"},
             {"submitted_at": 1, "score": 1}
         ).sort("submitted_at", -1).limit(6))
-        
+
         for att in reversed(last_attempts):
             rank_history.append({
-                "week": (att.get("submitted_at") or datetime.now(timezone.utc)).strftime("%b %d"), 
+                "week": (att.get("submitted_at") or datetime.now(timezone.utc)).strftime("%b %d"),
                 "rank": int(round(float(att.get("score", 0.0) or 0.0)))
             })
 
-        if not rank_history: rank_history = [{"week": "Now", "rank": 0}]
+        if not rank_history:
+            rank_history = [{"week": "Now", "rank": 0}]
 
         result = {
             "overall_rank": curr_rank,
@@ -728,13 +831,15 @@ class StudentService:
         }
         cache_set(cache_key, result, ttl=timedelta(minutes=3))
         return result
+
     @staticmethod
     def list_library(db: Database, student: dict, subject: str | None = None) -> list[dict]:
         year = student.get("year")
 
         and_conditions = [{"status": "approved"}, {"year": year}]
         if subject:
-            and_conditions.append({"$or": [{"subject": subject}, {"subject": "All"}]})
+            and_conditions.append(
+                {"$or": [{"subject": subject}, {"subject": "All"}]})
 
         query: dict = {"$and": and_conditions}
 
@@ -750,8 +855,10 @@ class StudentService:
                             "$match": {
                                 "$expr": {
                                     "$or": [
-                                        {"$eq": ["$library_item_id", "$$item_id"]},
-                                        {"$eq": ["$library_item_id", "$$str_item_id"]}
+                                        {"$eq": [
+                                            "$library_item_id", "$$item_id"]},
+                                        {"$eq": ["$library_item_id",
+                                                 "$$str_item_id"]}
                                     ]
                                 }
                             }
@@ -830,7 +937,13 @@ class StudentService:
             metadata={"library_item_id": str(item_oid)},
         )
 
-        file_doc = db.library_files.find_one({"library_item_id": str(item_oid)})
+        file_doc = db.library_files.find_one(
+            {"library_item_id": str(item_oid)})
+
+        # Fallback: try with ObjectId for backwards compatibility with old files
+        if not file_doc:
+            file_doc = db.library_files.find_one({"library_item_id": item_oid})
+
         if not file_doc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -844,18 +957,23 @@ class StudentService:
                 detail="Original file not available for this material",
             )
         try:
-            content = (
-                raw_content.encode("utf-8")
-                if isinstance(raw_content, str)
-                else bytes(raw_content)
-            )
+            # Handle MongoDB Binary objects and regular bytes
+            if hasattr(raw_content, '__bytes__'):
+                content = bytes(raw_content)
+            elif isinstance(raw_content, bytes):
+                content = raw_content
+            elif isinstance(raw_content, str):
+                content = raw_content.encode("utf-8")
+            else:
+                content = bytes(raw_content)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Original file not available for this material",
             ) from exc
 
-        filename = str(file_doc.get("filename") or item.get("file_name") or "material.bin")
+        filename = str(file_doc.get("filename") or item.get(
+            "file_name") or "material.bin")
         content_type = str(
             file_doc.get("content_type")
             or item.get("file_content_type")
@@ -889,7 +1007,8 @@ class StudentService:
 
     @staticmethod
     def list_notifications(db: Database, user: dict) -> list[dict]:
-        docs = db.notifications.find({"user_id": str(user["_id"])}).sort("created_at", -1)
+        docs = db.notifications.find(
+            {"user_id": str(user["_id"])}).sort("created_at", -1)
         return [serialize_id(doc) for doc in docs]
 
     @staticmethod
@@ -997,7 +1116,8 @@ class StudentService:
             db,
             student_id,
             payload.availability_hours,
-            payload.target_exam_date or datetime.now(timezone.utc) + timedelta(days=30),
+            payload.target_exam_date or datetime.now(
+                timezone.utc) + timedelta(days=30),
         )
 
     @staticmethod
@@ -1008,6 +1128,7 @@ class StudentService:
     def search_public_resources(db: Database, student: dict, topic: str, subject: str | None = None) -> list[dict]:
         sub = subject or student.get("subject", "Physics")
         return PublicResourceService.search_resources(sub, topic)
+
     @staticmethod
     def mark_study_plan_task_complete(db: Database, student: dict, task_id: str) -> bool:
         return PlannerService.mark_task_complete(db, str(student["_id"]), task_id)
@@ -1055,7 +1176,8 @@ class StudentService:
     @staticmethod
     def list_student_doubts(db: Database, student: dict, *, limit: int = 20) -> list[dict]:
         safe_limit = max(1, min(limit, 100))
-        docs = db.student_doubts.find({"student_id": str(student["_id"])}).sort("created_at", -1).limit(safe_limit)
+        docs = db.student_doubts.find({"student_id": str(student["_id"])}).sort(
+            "created_at", -1).limit(safe_limit)
         return [serialize_id(doc) for doc in docs]
 
     @staticmethod
@@ -1071,33 +1193,39 @@ class StudentService:
 
     @staticmethod
     def list_chat_sessions(db: Database, student: dict, limit: int = 20) -> list[dict]:
-        docs = db.chat_sessions.find({"student_id": str(student["_id"])}).sort("updated_at", -1).limit(limit)
+        docs = db.chat_sessions.find({"student_id": str(student["_id"])}).sort(
+            "updated_at", -1).limit(limit)
         return [serialize_id(doc) for doc in docs]
 
     @staticmethod
     def get_chat_session_messages(db: Database, student: dict, session_id: str) -> list[dict]:
         # Verify ownership
-        session = db.chat_sessions.find_one({"_id": parse_object_id(session_id, "session_id"), "student_id": str(student["_id"])})
+        session = db.chat_sessions.find_one({"_id": parse_object_id(
+            session_id, "session_id"), "student_id": str(student["_id"])})
         if not session:
-            # Check if it might be a newly created session from sidebar navigation that doesn't strictly exist yet? 
+            # Check if it might be a newly created session from sidebar navigation that doesn't strictly exist yet?
             # No, backend should correct strict ownership.
-            # But return empty if not found to avoid crashing frontend? 
+            # But return empty if not found to avoid crashing frontend?
             # Better to raise error or return empty. User expects messages.
             return []
-            
-        docs = db.chat_messages.find({"session_id": session_id}).sort("created_at", 1)
+
+        docs = db.chat_messages.find(
+            {"session_id": session_id}).sort("created_at", 1)
         return [serialize_id(doc) for doc in docs]
 
     @staticmethod
     def save_chat_message(db: Database, session_id: str, role: str, content: str) -> str:
         if role == "user":
-            session = db.chat_sessions.find_one({"_id": parse_object_id(session_id, "session_id")})
+            session = db.chat_sessions.find_one(
+                {"_id": parse_object_id(session_id, "session_id")})
             if session and (session.get("title") == "New Chat"):
-                existing = db.chat_messages.count_documents({"session_id": session_id})
+                existing = db.chat_messages.count_documents(
+                    {"session_id": session_id})
                 if existing == 0:
                     suggested = " ".join(str(content).split()).strip()
                     if suggested:
-                        title = suggested[:30] + ("..." if len(suggested) > 30 else "")
+                        title = suggested[:30] + \
+                            ("..." if len(suggested) > 30 else "")
                         db.chat_sessions.update_one(
                             {"_id": parse_object_id(session_id, "session_id")},
                             {"$set": {"title": title}},
@@ -1110,7 +1238,7 @@ class StudentService:
             "created_at": datetime.now(timezone.utc),
         }
         result = db.chat_messages.insert_one(doc)
-        
+
         # Update session updated_at
         db.chat_sessions.update_one(
             {"_id": parse_object_id(session_id, "session_id")},
@@ -1121,17 +1249,20 @@ class StudentService:
     @staticmethod
     def update_session_title(db: Database, student: dict, session_id: str, title: str) -> bool:
         result = db.chat_sessions.update_one(
-            {"_id": parse_object_id(session_id, "session_id"), "student_id": str(student["_id"])},
-            {"$set": {"title": title, "updated_at": datetime.now(timezone.utc)}}
+            {"_id": parse_object_id(session_id, "session_id"),
+             "student_id": str(student["_id"])},
+            {"$set": {"title": title,
+                      "updated_at": datetime.now(timezone.utc)}}
         )
         return result.modified_count > 0
 
     @staticmethod
     def delete_chat_session(db: Database, student: dict, session_id: str) -> bool:
         # Verify ownership and delete
-        query = {"_id": parse_object_id(session_id, "session_id"), "student_id": str(student["_id"])}
+        query = {"_id": parse_object_id(
+            session_id, "session_id"), "student_id": str(student["_id"])}
         result = db.chat_sessions.delete_one(query)
-        
+
         if result.deleted_count > 0:
             # Delete associated messages
             db.chat_messages.delete_many({"session_id": session_id})
@@ -1148,10 +1279,11 @@ class StudentService:
                     "subject": str(question.get("subject") or "General"),
                     "text": str(question.get("text") or f"Question {index}"),
                     "options": [str(option) for option in (question.get("options") or [])],
+                    "topic": str(question.get("topic") or "General"),
+                    "subtopic": str(question.get("subtopic") or "General"),
                 }
             )
         return payload
-
 
     @staticmethod
     def _normalize_answer(value: object) -> int | None:
@@ -1193,7 +1325,8 @@ class StudentService:
 
         student_id = str(student["_id"])
         class_ids = set(StudentService._student_class_ids(db, student_id))
-        test_class_ids = {str(class_id) for class_id in test.get("assigned_to_class_ids", []) if class_id}
+        test_class_ids = {str(class_id) for class_id in test.get(
+            "assigned_to_class_ids", []) if class_id}
         if test_class_ids:
             return bool(class_ids.intersection(test_class_ids))
 

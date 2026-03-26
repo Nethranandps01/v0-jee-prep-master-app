@@ -3,12 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/app-context";
 import { listNotifications } from "@/lib/api-client";
-import { useTheme } from "next-themes";
-import { ArrowLeft, Bell, Search, Sun, Moon, Rocket, UserCircle } from "lucide-react";
+import { ArrowLeft, Bell, Search, Rocket, UserCircle } from "lucide-react";
 
 export function TopBar() {
   const { navigate, role, authToken, screen } = useApp();
-  const { theme, setTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
   const hasFetchedRef = useRef(false);
 
@@ -113,39 +111,39 @@ export function TopBar() {
     screen !== "admin-dashboard";
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-card/95 px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-inset-top))] backdrop-blur-xl">
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-primary/80 bg-primary px-4 pb-3 pt-[calc(0.75rem+var(--safe-area-inset-top))] shadow-sm">
       <div className="flex items-center gap-2">
         {showBack && (
           <button
             onClick={() => backTarget && navigate(backTarget)}
-            className="mr-1 flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="mr-1 flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground/90 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
             aria-label="Go back"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
         )}
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-foreground/15">
           <Rocket className="h-4 w-4 text-primary-foreground" />
         </div>
         <div className="flex flex-col">
-          <span className="text-sm font-bold text-foreground">BrainJEE</span>
+          <span className="text-sm font-bold text-primary-foreground">BrainJEE</span>
           {role === "admin" && (
-            <span className="text-[10px] font-medium text-warning">Principal</span>
+            <span className="text-[10px] font-medium text-accent">Principal</span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <button
+        {/* <button
           onClick={handleSearchClick}
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground/90 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
           aria-label="Search"
         >
           <Search className="h-5 w-5" />
-        </button>
+        </button> */}
         {role !== "admin" && (
           <button
             onClick={() => navigate("notifications")}
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground/90 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
             aria-label={`Notifications, ${unreadCount} unread`}
           >
             <Bell className="h-5 w-5" />
@@ -157,19 +155,8 @@ export function TopBar() {
           </button>
         )}
         <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? (
-            <Sun className="h-5 w-5" />
-          ) : (
-            <Moon className="h-5 w-5" />
-          )}
-        </button>
-        <button
           onClick={handleProfileClick}
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground/90 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
           aria-label="Profile"
         >
           <UserCircle className="h-5 w-5" />

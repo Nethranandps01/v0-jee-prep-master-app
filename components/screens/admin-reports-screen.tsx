@@ -167,22 +167,7 @@ export function AdminReportsScreen() {
           <h1 className="text-xl font-bold text-foreground">Reports</h1>
           <p className="text-xs text-muted-foreground">{loading ? 'Fetching...' : 'Institution analytics & billing'}</p>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={isExporting || loading}
-          className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-transform active:scale-95 disabled:opacity-60"
-        >
-          <Download className="h-3.5 w-3.5" />
-          {isExporting ? "Exporting..." : "Export"}
-        </button>
       </div>
-
-      {exportError && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {exportError}
-        </div>
-      )}
-
       {/* Section Toggle */}
       <div className="animate-fade-in flex gap-2" style={{ animationDelay: "50ms" }}>
         <button
@@ -196,17 +181,7 @@ export function AdminReportsScreen() {
           <BarChart3 className="h-3.5 w-3.5" />
           Analytics
         </button>
-        <button
-          onClick={() => setActiveSection("billing")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-medium transition-colors ${
-            activeSection === "billing"
-              ? "bg-primary text-primary-foreground"
-              : "border border-border bg-card text-muted-foreground"
-          }`}
-        >
-          <CreditCard className="h-3.5 w-3.5" />
-          Billing
-        </button>
+      
       </div>
 
       {loading ? (
@@ -318,54 +293,7 @@ export function AdminReportsScreen() {
         </>
       ) : billing ? (
         <>
-          {/* Billing Info */}
-          <div
-            className="animate-fade-in flex flex-col gap-4 rounded-2xl border border-border bg-card p-4"
-            style={{ animationDelay: "100ms" }}
-          >
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold text-foreground">Subscription</h2>
-            </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Plan</span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                  {billing.plan}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Students Used</span>
-                <span className="text-xs font-medium text-foreground">
-                  {billing.students_used} / {billing.students_allowed}
-                </span>
-              </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full ${
-                    billing.students_allowed > 0 &&
-                    billing.students_used / billing.students_allowed > 0.9
-                      ? "bg-warning"
-                      : "bg-primary"
-                  }`}
-                  style={{
-                    width: `${
-                      billing.students_allowed > 0
-                        ? (billing.students_used / billing.students_allowed) * 100
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Renewal Date</span>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">{billing.renewal_date}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          
 
           {/* Monthly Usage */}
           <div

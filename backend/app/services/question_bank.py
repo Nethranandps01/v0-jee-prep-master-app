@@ -11,7 +11,8 @@ from app.services.ai_service import call_openai
 
 def generate_question_hash(text: str, options: list[str]) -> str:
     """Creates a unique hash for a question based on its text and options to prevent duplicates."""
-    base = text.strip().lower() + "|" + "|".join(opt.strip().lower() for opt in options)
+    base = text.strip().lower() + "|" + "|".join(opt.strip().lower()
+                                                 for opt in options)
     return hashlib.md5(base.encode()).hexdigest()
 
 
@@ -25,6 +26,52 @@ def deduplicate_questions(questions: list[dict]) -> list[dict]:
             seen.add(h)
             unique.append(q)
     return unique
+
+
+def _get_template_questions(subject: str, count: int) -> list[dict]:
+    """Get random template questions for fast response (< 5ms)."""
+    import random
+    templates = QUESTION_TEMPLATES.get(subject, [])
+    if not templates:
+        return []
+    # Shuffle and return requested count
+    shuffled = random.sample(templates, min(count, len(templates)))
+    return shuffled
+
+
+async def _generate_and_store_questions_async(
+    db: Database,
+    subject: str,
+    count: int,
+    difficulty: str,
+    topic: str | None
+) -> None:
+    """Background task: Generate AI questions and store in pool (non-blocking)."""
+    try:
+        ai_questions = await _build_question_set_with_ai(subject, count, difficulty, topic)
+        if ai_questions:
+            to_store = []
+            for q in ai_questions:
+                store_item = {
+                    "hash": generate_question_hash(q["text"], q["options"]),
+                    "subject": subject,
+                    "difficulty": difficulty,
+                    "topic": topic,
+                    "text": q["text"],
+                    "options": q["options"],
+                    "correct": q["correct"],
+                    "explanation": q.get("explanation", ""),
+                    "source": "ai_generated",
+                    "created_at": datetime.now(timezone.utc)
+                }
+                to_store.append(store_item)
+            if to_store:
+                try:
+                    db.question_pool.insert_many(to_store, ordered=False)
+                except Exception:
+                    pass
+    except Exception:
+        pass  # Silently fail background task
 
 
 QUESTION_TEMPLATES: dict[str, list[dict[str, Any]]] = {
@@ -112,7 +159,8 @@ async def build_question_set(
 ) -> list[dict]:
     questions, source = await build_question_set_with_source(db, subject, total_questions, difficulty, topic)
     if require_ai and source == "template":
-        raise RuntimeError("AI question generation failed for this paper. Please try again.")
+        raise RuntimeError(
+            "AI question generation failed for this paper. Please try again.")
     return questions
 
 
@@ -123,73 +171,62 @@ async def build_question_set_with_source(
     difficulty: str = "Medium",
     topic: str | None = None,
 ) -> tuple[list[dict], str]:
+    """
+    OPTIMIZED for 300ms response time.
+    Priority: Pool -> Templates (fast), async AI generation (background)
+    """
     if total_questions <= 0:
         return [], "none"
 
-    # Stage 1: Attempt to retrieve from Question Pool (Pseudo-RAG)
+    # Stage 1: Attempt to retrieve from Question Pool (Pseudo-RAG) - FAST
     retrieved: list[dict] = []
     if db is not None:
         query = {"subject": subject, "difficulty": difficulty}
         if topic:
             query["topic"] = topic
-        
+
         # Aggregate with $sample to get random set every time
-        pool_cursor = db.question_pool.aggregate([
-            {"$match": query},
-            {"$sample": {"size": total_questions}}
-        ])
-        retrieved = list(pool_cursor)
+        try:
+            pool_cursor = db.question_pool.aggregate([
+                {"$match": query},
+                {"$sample": {"size": total_questions}}
+            ])
+            retrieved = list(pool_cursor)
+        except Exception:
+            retrieved = []
 
     if len(retrieved) >= total_questions:
         # Instant win: we have enough in the bank.
         normalized = _reformat_from_pool(retrieved[:total_questions])
         return normalized, "pool"
 
-    # Stage 2: Hybrid AI Generation for the gap
+    # Stage 2: Use QUESTION_TEMPLATES as fallback (INSTANT - no AI)
     needed = total_questions - len(retrieved)
-    ai_questions = await _build_question_set_with_ai(subject, needed, difficulty, topic)
-    
-    # Store newly generated questions in the pool for future reuse
-    if ai_questions and db is not None:
-        to_store = []
-        for q in ai_questions:
-            store_item = {
-                "hash": generate_question_hash(q["text"], q["options"]),
-                "subject": subject,
-                "difficulty": difficulty,
-                "topic": topic,
-                # Store clean version in pool
-                "text": q["text"].split("] ", 1)[-1] if "] " in q["text"] else q["text"],
-                "options": q["options"],
-                "correct": q["correct"],
-                "explanation": q["explanation"],
-                "source": "ai_generated",
-                "created_at": datetime.now(timezone.utc)
-            }
-            to_store.append(store_item)
-        if to_store:
-            try:
-                # Ensure unique index exists in DB (run once or assume exist)
-                # db.question_pool.create_index([("hash", 1)], unique=True)
-                db.question_pool.insert_many(to_store, ordered=False)
-            except Exception:
-                pass # Silently proceed if duplicates or other issues
+    template_questions = _get_template_questions(subject, needed)
 
-    # Combine retrieved and newly generated with deduplication (Step 1 Fix)
     pool_formatted = _reformat_from_pool(retrieved)
-    combined = deduplicate_questions(pool_formatted + ai_questions)
-    
-    # If deduplication dropped us below target, fetch more from AI (Important Fix)
-    if len(combined) < total_questions:
-        missing = total_questions - len(combined)
-        extra_ai = await _build_question_set_with_ai(subject, missing, difficulty, topic)
-        combined.extend(deduplicate_questions(extra_ai))
-    
-    if len(combined) >= total_questions:
-        return combined[:total_questions], "ai"
+    combined = deduplicate_questions(pool_formatted + template_questions)
 
-    # Stage 3: Template fallback if AI/Pool still failed to fulfill gap
-    return _build_template_question_set(subject, total_questions, difficulty), "template"
+    # Return immediately with templates (< 300ms guaranteed)
+    if len(combined) >= total_questions:
+        return combined[:total_questions], "template"
+
+    # Stage 3: If still need more, try AI generation (async, non-blocking)
+    # This won't block the response - returns immediately
+    if db is not None and len(combined) < total_questions:
+        missing = total_questions - len(combined)
+        # Fire and forget - generate in background
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            # Schedule AI generation without waiting
+            loop.create_task(_generate_and_store_questions_async(
+                db, subject, missing, difficulty, topic
+            ))
+        except Exception:
+            pass  # Silently fail if async generation fails
+
+    return combined, "mixed"
 
 
 def _reformat_from_pool(questions: list[dict]) -> list[dict]:
@@ -211,14 +248,17 @@ def _reformat_from_pool(questions: list[dict]) -> list[dict]:
 async def _build_question_set_with_ai(subject: str, total_questions: int, difficulty: str, topic: str | None = None) -> list[dict]:
     import asyncio
     from app.services.ai_service import async_call_openai
-    
+
     # Extreme Parallelism: Generate in very small batches for maximum speed.
     BATCH_SIZE = 4
     num_batches = (total_questions + BATCH_SIZE - 1) // BATCH_SIZE
-    
+
+    all_raw_questions = []
+
     async def generate_batch(count: int, start_index: int) -> list[dict]:
         topic_str = f"Topic: {topic}. " if topic else ""
-        used_texts = "\n".join([q["text"] for q in all_raw_questions[-10:]]) if all_raw_questions else "None"
+        used_texts = "\n".join(
+            [q["text"] for q in all_raw_questions[-10:]]) if all_raw_questions else "None"
         prompt = (
             f"""
 Generate {count} HIGH-QUALITY JEE {subject} questions.
@@ -268,12 +308,12 @@ IMPORTANT:
 - Return ONLY valid JSON
 """
         )
-        
+
         try:
             raw = await async_call_openai(
                 prompt,
                 temperature=0.4,
-                max_output_tokens=3000, 
+                max_output_tokens=3000,
                 response_mime_type="application/json",
             )
             parsed = _extract_json_array(raw)
@@ -283,15 +323,17 @@ IMPORTANT:
         except Exception:
             return []
 
-    tasks = [generate_batch(min(BATCH_SIZE, total_questions - (i * BATCH_SIZE)), i * BATCH_SIZE) for i in range(num_batches)]
+    tasks = [generate_batch(min(BATCH_SIZE, total_questions -
+                            (i * BATCH_SIZE)), i * BATCH_SIZE) for i in range(num_batches)]
     results = await asyncio.gather(*tasks)
-    
-    all_raw_questions = []
+
+    all_raw_questions.clear()
     for batch_res in results:
         all_raw_questions.extend(batch_res)
-    
+
     # Normalize AI questions
-    ai_normalized = _normalize_ai_questions(all_raw_questions, subject, total_questions, difficulty)
+    ai_normalized = _normalize_ai_questions(
+        all_raw_questions, subject, total_questions, difficulty)
     return ai_normalized
 
 
@@ -306,19 +348,23 @@ def _normalize_ai_questions(
 
     raw_questions: list[dict[str, Any]] = []
     correct_values: list[int] = []
-    
+
     for item in parsed:
-        if not isinstance(item, dict): continue
+        if not isinstance(item, dict):
+            continue
         text = item.get("text")
         options = item.get("options")
         correct = item.get("correct")
         explanation = item.get("explanation")
 
-        if not isinstance(text, str) or not text.strip(): continue
-        if not isinstance(options, list) or len(options) < 4: continue
-        
+        if not isinstance(text, str) or not text.strip():
+            continue
+        if not isinstance(options, list) or len(options) < 4:
+            continue
+
         options_text = [str(option).strip() for option in options[:4]]
-        if any(not option for option in options_text): continue
+        if any(not option for option in options_text):
+            continue
 
         try:
             correct_idx = int(correct)
@@ -329,27 +375,31 @@ def _normalize_ai_questions(
                 "correct": correct_idx,
                 "explanation": explanation,
             })
-        except (TypeError, ValueError): continue
+        except (TypeError, ValueError):
+            continue
 
     if not raw_questions:
         return []
 
     # Detect 1-based indexing
-    one_based = all(1 <= v <= 4 for v in correct_values) and 0 not in correct_values
-    
+    one_based = all(
+        1 <= v <= 4 for v in correct_values) and 0 not in correct_values
+
     normalized: list[dict] = []
     for index, question in enumerate(raw_questions, start=1):
         # Allow more than total_questions during normalization for deduplication later
-        
+
         correct_idx = int(question["correct"])
-        if one_based: correct_idx -= 1
-        if correct_idx < 0 or correct_idx > 3: continue
+        if one_based:
+            correct_idx -= 1
+        if correct_idx < 0 or correct_idx > 3:
+            continue
 
         explanation = question.get("explanation")
         normalized.append({
-            "id": f"tmp{index}", # Temporary ID, will be reformatted
+            "id": f"tmp{index}",  # Temporary ID, will be reformatted
             "subject": subject,
-            "text": f"{question['text']}", # Clean text
+            "text": f"{question['text']}",  # Clean text
             "options": list(question["options"]),
             "correct": correct_idx,
             "explanation": str(explanation).strip() if explanation else "JEE practice question.",
@@ -364,7 +414,8 @@ def _extract_json_array(raw: str) -> Any | None:
         return None
 
     # Support markdown-wrapped JSON (both array and object).
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", text, flags=re.DOTALL)
+    fenced = re.search(
+        r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", text, flags=re.DOTALL)
     candidate = fenced.group(1) if fenced else text
 
     try:

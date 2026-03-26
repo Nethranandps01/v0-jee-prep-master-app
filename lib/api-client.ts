@@ -962,7 +962,7 @@ export async function downloadStudentLibraryItem(
 
   const contentDisposition = response.headers.get("content-disposition") ?? "";
   const filenameMatch = /filename="?([^"]+)"?/i.exec(contentDisposition);
-  const filename = filenameMatch?.[1] ?? `${itemId}.txt`;
+  const filename = filenameMatch?.[1] ?? `${itemId}.pdf`;
   const blob = await response.blob();
   return { filename, blob };
 }

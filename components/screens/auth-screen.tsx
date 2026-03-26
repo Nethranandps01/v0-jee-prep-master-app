@@ -18,11 +18,7 @@ import {
   GraduationCap,
   Shield,
   Zap,
-  Moon,
-  Sun,
 } from "lucide-react";
-import { useTheme } from "next-themes";
-import { theme } from "@/lib/theme";
 
 type AuthStep = "role" | "login";
 type AuthMode = "signin" | "signup";
@@ -66,7 +62,6 @@ export function AuthScreen() {
     clearAuth,
   } = useApp();
 
-  const { theme: currentTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   const [step, setStep] = useState<AuthStep>("role");
@@ -200,10 +195,6 @@ export function AuthScreen() {
     }
   };
 
-  const toggleTheme = () => {
-    setTheme(currentTheme === "dark" ? "light" : "dark");
-  };
-
   if (!mounted) return null;
 
   return (
@@ -224,13 +215,6 @@ export function AuthScreen() {
             JEE Prep Master
           </span>
         </div>
-        <button
-          onClick={toggleTheme}
-          className="flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-border hover:bg-muted/50 transition-all shadow-sm"
-          aria-label="Toggle theme"
-        >
-          {currentTheme === "dark" ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-primary" />}
-        </button>
       </div>
 
       <div className="flex flex-1 flex-col px-6 pt-10">
@@ -275,7 +259,7 @@ export function AuthScreen() {
                   className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-6 transition-all hover:border-accent/50 hover:bg-accent/5 active:scale-95 shadow-sm group"
                 >
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted group-hover:bg-accent/10 transition-colors">
-                    <Shield className="h-7 w-7 text-accent" />
+                    <Shield className="h-7 w-7 text-primary" />
                   </div>
                   <span className="text-sm font-bold">Admin</span>
                 </button>
@@ -309,11 +293,10 @@ export function AuthScreen() {
                     setMode("signin");
                     setAuthError(null);
                   }}
-                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
-                    mode === "signin" 
-                      ? "bg-card text-foreground shadow-sm" 
+                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${mode === "signin"
+                      ? "bg-card text-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-card/50"
-                  }`}
+                    }`}
                 >
                   Sign In
                 </button>
@@ -325,11 +308,10 @@ export function AuthScreen() {
                     setAuthError(null);
                   }}
                   disabled={selectedRole === "admin"}
-                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all disabled:opacity-30 ${
-                    mode === "signup" 
-                      ? "bg-card text-foreground shadow-sm" 
+                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all disabled:opacity-30 ${mode === "signup"
+                      ? "bg-card text-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-card/50"
-                  }`}
+                    }`}
                 >
                   Sign Up
                 </button>
@@ -420,7 +402,7 @@ export function AuthScreen() {
                 </div>
 
                 {mode === "signup" && selectedRole === "teacher" && (
-                   <div className="space-y-2">
+                  <div className="space-y-2">
                     <Label htmlFor="subject" className="text-sm font-semibold">
                       Your Specialization
                     </Label>
@@ -457,8 +439,8 @@ export function AuthScreen() {
 
               {authError && (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive font-medium flex items-center gap-2">
-                   <Shield className="h-4 w-4 shrink-0" />
-                   {authError}
+                  <Shield className="h-4 w-4 shrink-0" />
+                  {authError}
                 </div>
               )}
 

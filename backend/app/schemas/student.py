@@ -4,6 +4,39 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+# Analysis Models
+class TopicStatsModel(BaseModel):
+    topic: str
+    accuracy: float
+    correct: int
+    attempted: int
+    subject: str | None = None
+
+
+class WeakTopicModel(BaseModel):
+    topic: str
+    accuracy: float
+    correct: int
+    attempted: int
+
+
+class MistakePatternModel(BaseModel):
+    patterns: dict[str, int]
+    mistake_examples: list[dict] = Field(default_factory=list)
+
+
+class TestAnalysisModel(BaseModel):
+    overall_accuracy: float
+    topic_breakdown: dict[str, dict]
+    subtopic_breakdown: dict[str, dict]
+    weak_topics: list[WeakTopicModel]
+    strong_topics: list[WeakTopicModel]
+    mistake_patterns: dict[str, int]
+    mistake_examples: list[dict]
+    total_questions_attempted: int
+    total_correct: int
+
+
 class StudentHomeSummaryResponse(BaseModel):
     assigned_tests: int
     completed_tests: int
@@ -30,6 +63,8 @@ class AttemptQuestionResponse(BaseModel):
     subject: str
     text: str
     options: list[str]
+    topic: str | None = None
+    subtopic: str | None = None
 
 
 class StartAttemptResponse(BaseModel):
@@ -63,6 +98,8 @@ class SubmitAttemptResponse(BaseModel):
     partial_correct: int | None = None
     raw_score: float | None = None
     max_score: float | None = None
+    analysis: dict | None = None
+    ai_feedback: str | None = None
 
 
 class ResultQuestionResponse(BaseModel):
@@ -74,6 +111,8 @@ class ResultQuestionResponse(BaseModel):
     correct_answer: int
     is_correct: bool
     explanation: str
+    topic: str | None = None
+    subtopic: str | None = None
 
 
 class ResultResponse(BaseModel):
@@ -92,6 +131,8 @@ class ResultResponse(BaseModel):
     accuracy: float | None = None
     submitted_at: datetime
     questions: list[ResultQuestionResponse] = Field(default_factory=list)
+    analysis: dict | None = None
+    ai_feedback: str | None = None
 
 
 class RankPoint(BaseModel):

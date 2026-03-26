@@ -77,6 +77,8 @@ export function AdminUsersScreen() {
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState<string | null>(null);
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [form, setForm] = useState(defaultForm);
+  const [selectedClass, setSelectedClass] = useState<Year | "all">("all");
+  const [selectedSubject, setSelectedSubject] = useState<Subject | "all">("all");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -305,6 +307,43 @@ export function AdminUsersScreen() {
         })}
       </div>
 
+      {/* Class Filter - Show only for students tab */}
+      {activeTab === "student" && (
+        <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>
+          <label className="text-xs font-medium text-muted-foreground mb-2 block">
+            Filter by Class
+          </label>
+          <select
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value as Year | "all")}
+            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="all">All Classes</option>
+            <option value="11th">11th Class</option>
+            <option value="12th">12th Class</option>
+          </select>
+        </div>
+      )}
+
+      {/* Subject Filter - Show only for teachers tab */}
+      {activeTab === "teacher" && (
+        <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>
+          <label className="text-xs font-medium text-muted-foreground mb-2 block">
+            Filter by Subject
+          </label>
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value as Subject | "all")}
+            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="all">All Subjects</option>
+            <option value="Physics">Physics</option>
+            <option value="Chemistry">Chemistry</option>
+            <option value="Mathematics">Mathematics</option>
+          </select>
+        </div>
+      )}
+
       {/* User List */}
       <div className="animate-fade-in flex flex-col gap-2" style={{ animationDelay: "150ms" }}>
         {loading ? (
@@ -325,105 +364,231 @@ export function AdminUsersScreen() {
             <p className="text-sm text-muted-foreground">No users found</p>
           </div>
         ) : (
-          users.map((user) => {
-            const isExpanded = expandedUser === user.id;
-            return (
-              <div
-                key={user.id}
-                className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
-              >
-                <button
-                  onClick={() => setExpandedUser(isExpanded ? null : user.id)}
-                  className="flex items-center gap-3 p-3 text-left"
-                >
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${user.role === "teacher"
-                      ? "bg-accent/15 text-accent"
-                      : "bg-primary/15 text-primary"
-                      }`}
-                  >
-                    {user.name.charAt(0)}
-                  </div>
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">{user.name}</span>
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${user.status === "active"
-                          ? "bg-accent/15 text-accent"
-                          : "bg-muted text-muted-foreground"
-                          }`}
-                      >
-                        {user.status}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">
-                      {user.role === "teacher"
-                        ? `${user.subject ?? "N/A"} Teacher`
-                        : `${user.year ?? "N/A"} Student`}
-                    </span>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
+          <>
+            {/* For Students tab, filter by selected class */}
+            {activeTab === "student" ? (
+              (() => {
+                const filteredStudents = selectedClass === "all"
+                  ? users
+                  : users.filter((u) => u.year === selectedClass);
 
-                {isExpanded && (
-                  <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5" />
-                      {user.email}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Role:</span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground capitalize">
-                        {user.role}
-                      </span>
-                    </div>
-                    {user.role === "student" && user.year && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Year:</span>
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                          {user.year} Class
-                        </span>
-                      </div>
-                    )}
-                    {user.role === "teacher" && user.subject && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Subject:</span>
-                        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
-                          {user.subject}
-                        </span>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => toggleStatus(user)}
-                      disabled={statusUpdatingUserId === user.id}
-                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${user.status === "active"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-accent/10 text-accent"
-                        }`}
-                    >
-                      {statusUpdatingUserId === user.id ? (
-                        "Updating..."
-                      ) : user.status === "active" ? (
-                        <>
-                          <ToggleRight className="h-4 w-4" />
-                          Deactivate User
-                        </>
-                      ) : (
-                        <>
-                          <ToggleLeft className="h-4 w-4" />
-                          Activate User
-                        </>
-                      )}
-                    </button>
+                return filteredStudents.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-8">
+                    <Users className="h-8 w-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No students found in this class</p>
                   </div>
-                )}
-              </div>
-            );
-          })
+                ) : (
+                  filteredStudents.map((user) => {
+                    const isExpanded = expandedUser === user.id;
+                    return (
+                      <div
+                        key={user.id}
+                        className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
+                      >
+                        <button
+                          onClick={() => setExpandedUser(isExpanded ? null : user.id)}
+                          className="flex items-center gap-3 p-3 text-left"
+                        >
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${user.role === "teacher"
+                              ? "bg-accent/15 text-accent"
+                              : "bg-primary/15 text-primary"
+                              }`}
+                          >
+                            {user.name.charAt(0)}
+                          </div>
+                          <div className="flex flex-1 flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-foreground">{user.name}</span>
+                              <span
+                                className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${user.status === "active"
+                                  ? "bg-accent/15 text-accent"
+                                  : "bg-muted text-muted-foreground"
+                                  }`}
+                              >
+                                {user.status}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">
+                              {user.role === "teacher"
+                                ? `${user.subject ?? "N/A"} Teacher`
+                                : `${user.year ?? "N/A"} Student`}
+                            </span>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Mail className="h-3.5 w-3.5" />
+                              {user.email}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Role:</span>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground capitalize">
+                                {user.role}
+                              </span>
+                            </div>
+                            {user.role === "student" && user.year && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Year:</span>
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                  {user.year} Class
+                                </span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => toggleStatus(user)}
+                              disabled={statusUpdatingUserId === user.id}
+                              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${user.status === "active"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-accent/10 text-accent"
+                                }`}
+                            >
+                              {statusUpdatingUserId === user.id ? (
+                                "Updating..."
+                              ) : user.status === "active" ? (
+                                <>
+                                  <ToggleRight className="h-4 w-4" />
+                                  Deactivate User
+                                </>
+                              ) : (
+                                <>
+                                  <ToggleLeft className="h-4 w-4" />
+                                  Activate User
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                );
+              })()
+            ) : (
+              /* For All and Teachers tab - filter teachers by subject */
+              (() => {
+                const filteredUsers = activeTab === "teacher" && selectedSubject !== "all"
+                  ? users.filter((u) => u.subject === selectedSubject)
+                  : users;
+
+                return filteredUsers.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-8">
+                    <Users className="h-8 w-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {activeTab === "teacher" ? "No teachers found for this subject" : "No users found"}
+                    </p>
+                  </div>
+                ) : (
+                  filteredUsers.map((user) => {
+                    const isExpanded = expandedUser === user.id;
+                    return (
+                      <div
+                        key={user.id}
+                        className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
+                      >
+                        <button
+                          onClick={() => setExpandedUser(isExpanded ? null : user.id)}
+                          className="flex items-center gap-3 p-3 text-left"
+                        >
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${user.role === "teacher"
+                              ? "bg-accent/15 text-accent"
+                              : "bg-primary/15 text-primary"
+                              }`}
+                          >
+                            {user.name.charAt(0)}
+                          </div>
+                          <div className="flex flex-1 flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-foreground">{user.name}</span>
+                              <span
+                                className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${user.status === "active"
+                                  ? "bg-accent/15 text-accent"
+                                  : "bg-muted text-muted-foreground"
+                                  }`}
+                              >
+                                {user.status}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">
+                              {user.role === "teacher"
+                                ? `${user.subject ?? "N/A"} Teacher`
+                                : `${user.year ?? "N/A"} Student`}
+                            </span>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Mail className="h-3.5 w-3.5" />
+                              {user.email}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Role:</span>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground capitalize">
+                                {user.role}
+                              </span>
+                            </div>
+                            {user.role === "student" && user.year && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Year:</span>
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                  {user.year} Class
+                                </span>
+                              </div>
+                            )}
+                            {user.role === "teacher" && user.subject && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Subject:</span>
+                                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                                  {user.subject}
+                                </span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => toggleStatus(user)}
+                              disabled={statusUpdatingUserId === user.id}
+                              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${user.status === "active"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-accent/10 text-accent"
+                                }`}
+                            >
+                              {statusUpdatingUserId === user.id ? (
+                                "Updating..."
+                              ) : user.status === "active" ? (
+                                <>
+                                  <ToggleRight className="h-4 w-4" />
+                                  Deactivate User
+                                </>
+                              ) : (
+                                <>
+                                  <ToggleLeft className="h-4 w-4" />
+                                  Activate User
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                );
+              })()
+            )}
+          </>
         )}
       </div>
 

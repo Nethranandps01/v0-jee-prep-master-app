@@ -1,44 +1,44 @@
 export const theme = {
   colors: {
     // Backgrounds
-    background: "#F3F4F4",
+    background: "#F4F7FC",
     surface: "#FFFFFF",
-    surfaceSoft: "#EAF3F4",
-    backgroundGradient: "linear-gradient(135deg, #F3F4F4 0%, #EAF3F4 100%)",
+    surfaceSoft: "#EEF4FF",
+    backgroundGradient: "linear-gradient(180deg, #F4F7FC 0%, #EAF2FF 100%)",
 
-    // Primary (Teal System)
-    primary: "#1F6F78",
-    primaryLight: "#6FAFB6",
-    primarySoft: "#CFE6E8",
-    secondary: "#6FAFB6",
+    // Primary (Blue System)
+    primary: "#2D6FD2",
+    primaryLight: "#4C89E6",
+    primarySoft: "#DCE9FF",
+    secondary: "#1F57B7",
 
     // Accent (CTA / Highlights)
-    accent: "#F47C5C",
-    accentLight: "#FAD1C6",
+    accent: "#F39A3E",
+    accentLight: "#FDE3C8",
 
     // Text
-    textPrimary: "#1E2A2F",
-    textSecondary: "#5F6F73",
-    textMuted: "#9AA8AC",
+    textPrimary: "#1E2F4D",
+    textSecondary: "#5C6F8F",
+    textMuted: "#8B9BB5",
     textWhite: "#FFFFFF",
 
     // Buttons
-    buttonPrimaryBg: "#1F6F78",
+    buttonPrimaryBg: "#2D6FD2",
     buttonPrimaryText: "#FFFFFF",
 
     buttonSecondaryBg: "#FFFFFF",
-    buttonSecondaryBorder: "#1F6F78",
-    buttonSecondaryText: "#1F6F78",
+    buttonSecondaryBorder: "#2D6FD2",
+    buttonSecondaryText: "#2D6FD2",
 
     // UI Elements
-    border: "#E0E6E8",
-    divider: "#EDF1F2",
-    inputBackground: "#EDF1F2",
-    tagBackground: "#CFE6E8",
+    border: "#D8E2F2",
+    divider: "#E8EEF8",
+    inputBackground: "#EEF3FA",
+    tagBackground: "#DCE9FF",
 
     // Status
-    success: "#2D8C8F",
-    highlight: "#F47C5C",
+    success: "#34B36B",
+    highlight: "#F39A3E",
   },
 
   spacing: (factor: number) => `${factor * 8}px`,
@@ -56,15 +56,15 @@ export const theme = {
   },
 
   shadow: {
-    soft: "0 8px 20px rgba(0,0,0,0.05)",
-    card: "0 4px 12px rgba(0,0,0,0.06)",
+    soft: "0 10px 24px rgba(32, 87, 183, 0.10)",
+    card: "0 6px 18px rgba(21, 64, 139, 0.10)",
   },
 
   // Back-compat alias for older screens
   shadows: {
-    soft: "0 8px 20px rgba(0,0,0,0.05)",
-    card: "0 4px 12px rgba(0,0,0,0.06)",
-    button: "0 6px 16px rgba(31, 111, 120, 0.18)",
+    soft: "0 10px 24px rgba(32, 87, 183, 0.10)",
+    card: "0 6px 18px rgba(21, 64, 139, 0.10)",
+    button: "0 8px 20px rgba(45, 111, 210, 0.24)",
   },
 };
 
@@ -72,6 +72,6 @@ export type Theme = typeof theme;
 
 // Back-compat export for screens that import gradients
 export const gradients = {
-  primary: "linear-gradient(135deg, #1F6F78 0%, #6FAFB6 100%)",
-  accent: "linear-gradient(135deg, #F47C5C 0%, #FAD1C6 100%)",
+  primary: "linear-gradient(135deg, #2057B7 0%, #4C89E6 100%)",
+  accent: "linear-gradient(135deg, #F39A3E 0%, #FDE3C8 100%)",
 };

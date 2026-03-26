@@ -594,7 +594,7 @@ export function StudentTestActiveScreen() {
         ))}
       </div>
 
-      <div className="flex flex-1 flex-col gap-6 px-4 pb-32 pt-4">
+      <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 pb-32 pt-4">
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
             {question.subject}

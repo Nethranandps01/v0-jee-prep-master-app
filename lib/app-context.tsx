@@ -152,6 +152,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setScreen(newScreen);
   }, []);
 
+  // Restore screen on page load (runs once on mount)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const lastScreen = window.sessionStorage.getItem("last_screen") as AppScreen | null;
+    if (lastScreen && (lastScreen.startsWith("admin-") || lastScreen.startsWith("teacher-") || lastScreen.startsWith("student-"))) {
+      setScreen(lastScreen);
+    }
+  }, []);
+
+  // Save current screen to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Only save non-auth screens and non-splash screens
+    if (!screen.startsWith("splash") && !screen.startsWith("onboarding") && !screen.startsWith("auth")) {
+      window.sessionStorage.setItem("last_screen", screen);
+    }
+  }, [screen]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -183,13 +203,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRefreshToken(data.refreshToken);
       setTeacherSubject(data.teacherSubject ?? null);
       setStudentYear(data.studentYear ?? null);
-      setScreen(
-        data.role === "admin"
-          ? "admin-dashboard"
-          : data.role === "teacher"
-            ? "teacher-home"
-            : "student-home",
-      );
+
+      // Try to restore last screen, fallback to role-based default
+      const lastScreen = window.sessionStorage.getItem("last_screen") as AppScreen | null;
+      if (lastScreen && (lastScreen.startsWith("admin-") || lastScreen.startsWith("teacher-") || lastScreen.startsWith("student-"))) {
+        setScreen(lastScreen);
+      } else {
+        setScreen(
+          data.role === "admin"
+            ? "admin-dashboard"
+            : data.role === "teacher"
+              ? "teacher-home"
+              : "student-home",
+        );
+      }
     } catch {
       window.localStorage.removeItem(AUTH_STORAGE_KEY);
     }

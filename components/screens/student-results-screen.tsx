@@ -249,9 +249,9 @@ export function StudentResultsScreen() {
         </div>
         <div className="flex w-full gap-2 pt-2 overflow-x-auto pb-1">
           <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-primary/10 p-3">
-             <Trophy className="h-5 w-5 text-primary" />
-             <span className="text-lg font-bold text-foreground">{result.raw_score ?? result.score}</span>
-             <span className="text-[10px] text-muted-foreground">Marks</span>
+            <Trophy className="h-5 w-5 text-primary" />
+            <span className="text-lg font-bold text-foreground">{result.raw_score ?? result.score}</span>
+            <span className="text-[10px] text-muted-foreground">Marks</span>
           </div>
           <div className="flex flex-1 min-w-[70px] flex-col items-center gap-1 rounded-xl bg-accent/10 p-3">
             <CheckCircle2 className="h-5 w-5 text-accent" />
@@ -360,15 +360,14 @@ export function StudentResultsScreen() {
                       <button
                         key={filterValue}
                         onClick={() => setQuestionFilter(filterValue)}
-                        className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
-                          questionFilter === filterValue
-                            ? filterValue === "correct"
-                              ? "bg-accent text-accent-foreground"
-                              : filterValue === "wrong"
-                                ? "bg-destructive text-destructive-foreground"
-                                : "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }`}
+                        className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-colors ${questionFilter === filterValue
+                          ? filterValue === "correct"
+                            ? "bg-accent text-accent-foreground"
+                            : filterValue === "wrong"
+                              ? "bg-destructive text-destructive-foreground"
+                              : "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                          }`}
                       >
                         {filterValue}
                       </button>
@@ -380,11 +379,10 @@ export function StudentResultsScreen() {
                     <button
                       key={subject}
                       onClick={() => setSubjectFilter(subject)}
-                      className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
-                        subjectFilter === subject
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${subjectFilter === subject
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                        }`}
                     >
                       {subject}
                     </button>
@@ -439,18 +437,16 @@ function ResultQuestionCard({
   onToggle: () => void;
 }) {
   return (
-    <div className={`overflow-hidden rounded-2xl border transition-all duration-300 ${
-      expanded ? "border-primary/20 shadow-md" : "border-border"
-    } bg-card`}>
+    <div className={`overflow-hidden rounded-2xl border transition-all duration-300 ${expanded ? "border-primary/20 shadow-md" : "border-border"
+      } bg-card`}>
       <button onClick={onToggle} className="flex w-full items-center gap-3 p-4 text-left">
         <div
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-            question.is_correct
-              ? "bg-emerald-500/10 text-emerald-600"
-              : question.selected_answer === null
-                ? "bg-muted text-muted-foreground"
-                : "bg-rose-500/10 text-rose-600"
-          }`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${question.is_correct
+            ? "bg-emerald-500/10 text-emerald-600"
+            : question.selected_answer === null
+              ? "bg-muted text-muted-foreground"
+              : "bg-rose-500/10 text-rose-600"
+            }`}
         >
           {question.is_correct ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -484,9 +480,8 @@ function ResultQuestionCard({
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-medium text-muted-foreground">Your Answer:</span>
                 <span
-                  className={`text-[11px] font-semibold ${
-                    question.is_correct ? "text-emerald-600" : "text-rose-600"
-                  }`}
+                  className={`text-[11px] font-semibold ${question.is_correct ? "text-emerald-600" : "text-rose-600"
+                    }`}
                 >
                   {optionLabel(question.selected_answer, question.options)}
                 </span>
